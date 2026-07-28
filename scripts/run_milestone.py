@@ -26,8 +26,14 @@ from wakeUp.data import generate_fleet, build_dataset
 from wakeUp.attacks import build_attacked_dataset, AttackType, inject_position_jump
 from wakeUp.features import build_feature_matrix
 from wakeUp.models import KinematicRuleDetector, IsolationForestDetector
-from wakeUp.eval import plot_pr_curves, plot_score_hist, plot_window_example
+from wakeUp.eval import (
+    plot_pr_curves,
+    plot_robustness_curves,
+    plot_score_hist,
+    plot_window_example,
+)
 from wakeUp.eval.metrics import per_attack_metrics, dominant_attack_type, evaluate_scores
+from wakeUp.eval.robustness import default_detectors, run_robustness_sweeps
 
 
 def main() -> None:
@@ -38,6 +44,11 @@ def main() -> None:
         default=None,
         choices=[a.value for a in AttackType if a is not AttackType.NONE],
         help="restrict to one attack type (defensible slice); default = all five",
+    )
+    ap.add_argument(
+        "--robustness",
+        action="store_true",
+        help="also run the attack-subtlety sweeps (slower: rebuilds the dataset per severity)",
     )
     ap.add_argument("--outdir", default=None)
     args = ap.parse_args()
@@ -115,6 +126,21 @@ def main() -> None:
         clean_win, atk_win, fig_dir / "attack_example_jump.png",
         title="Position-jump attack (clean vs spoofed)",
     )
+
+    if args.robustness:
+        print("\n[+] robustness sweeps over attack subtlety ...")
+        sweep = run_robustness_sweeps(
+            windows, attack_cfg=cfg.attack, detectors=default_detectors(cfg.model)
+        )
+        sweep.to_csv(proc_dir / "robustness.csv", index=False)
+        plot_robustness_curves(sweep, fig_dir / "robustness_curves.png")
+        for param, g in sweep.groupby("param", sort=False):
+            print(f"\n=== {g['attack_type'].iloc[0]} ({param}) ===")
+            print(
+                g.pivot(index="value", columns="detector", values="pr_auc").to_string(
+                    float_format=lambda v: f"{v:.3f}"
+                )
+            )
 
     print(f"\nDone. Results -> {proc_dir/'results.json'}  Figures -> {fig_dir}/")
 

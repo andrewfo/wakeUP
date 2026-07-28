@@ -42,7 +42,9 @@ PyTorch Geometric (temporal GNN).
 - [x] `Makefile` targets: `data`, `features`, `train`, `eval`, `figures`,
       `milestone`, `test`.
 - [x] Deterministic seeds (`config.set_global_seed`).
-- [ ] Logging: CSV logger now; W&B behind an optional flag. ⬜
+- [ ] Logging: no run logger yet — results land as `results.json` /
+      `robustness.csv` artefacts. CSV run logger, then W&B behind an optional
+      flag. ⬜
 - **Deps:** `pyproject.toml` with a minimal core and `[learned]`, `[config]`,
   `[dev]` extras so the milestone installs light.
 
@@ -110,9 +112,13 @@ the eval harness treats them uniformly.
 - [x] Per-attack-type PR-AUC / ROC-AUC and FPR at fixed recall (each attack
       scored against clean windows only).
 - [x] Overall metrics + JSON results dump.
+- [x] Robustness curves: sweep `jump_km`, `speed_multiplier`,
+      `drift_total_km` → degradation curves (`eval/robustness.py`:
+      `sweep_attack_severity` / `run_robustness_sweeps`, plotted by
+      `plot_robustness_curves`, run via `--robustness` / `make robustness`).
+      Same windows corrupted at every severity, so the curve isolates
+      subtlety rather than sampling noise.
 - [ ] Detection latency (points-from-onset to first alarm). ⬜
-- [ ] Robustness curves: sweep `drift_total_km`, `jump_km`,
-      `speed_multiplier` → degradation curves. ⬜
 - [ ] Ablations: features-only vs learned vs hybrid. ⬜
 
 ## Phase 6 — Deliverable 🔨
@@ -138,12 +144,38 @@ tracks the rule baseline already saturates on gross violations
 (gradual drift ≈ 0.64, identity swap ≈ 0.77), while IsolationForest recovers
 them (≈ 0.97 each). That gap is the intended story and the motivation for the
 learned sequence models in Phase 4 — and the robustness sweeps in Phase 5 are
-what will make the benchmark discriminative rather than saturated.
+what make the benchmark discriminative rather than saturated.
+
+**Robustness result (synthetic, seed 1234, `--robustness`).** PR-AUC vs attack
+severity, base rate 0.15. The headline settings sit far into the saturated
+regime; the informative region is one to three orders of magnitude subtler:
+
+| knob | detector | subtle end → gross end |
+|---|---|---|
+| `jump_km` 0.001 → 8.0 | KinematicRule | 0.18 → 1.00 (knee ≈ 0.1 km) |
+| `jump_km` 0.001 → 8.0 | IsolationForest | 0.18 → 0.99 (knee ≈ 0.01 km) |
+| `speed_multiplier` 1.01 → 6.0 | KinematicRule | 0.20 → 1.00 (knee ≈ 1.25×) |
+| `speed_multiplier` 1.01 → 6.0 | IsolationForest | 0.28 → 1.00 (knee ≈ 1.1×) |
+| `drift_total_km` 0.02 → 3.0 | KinematicRule | 0.17 → 0.77 |
+| `drift_total_km` 0.02 → 3.0 | IsolationForest | 0.19 → 0.92 |
+
+Two things the flat table hid. (a) IsolationForest leads the rule by roughly a
+decade of severity on `position_jump` and dominates across the whole
+`gradual_drift` ladder — the learned-vs-physics gap is a *shift in the
+detection threshold*, not a fixed offset. (b) On `kinematic_impossible` the
+curves cross near 1.5×: the physics rule is strictly better once the violation
+is gross, since that is exactly what it tests. Because the synthetic fleet is
+perfectly self-consistent, these knees are optimistic; real AIS position noise
+should push them right, and quantifying that shift is the point of the Phase 1
+real-data ingest.
 
 ## Next actions
 
 1. LSTM-autoencoder over the sequence tensors — reconstruction error as the
    anomaly score, `fit`/`score` like the other detectors (Phase 4). Sequence
-   tensors now exist (`features/sequences.py`), so this is unblocked.
-2. Robustness sweep harness over attack subtlety (Phase 5).
-3. Real MarineCadastre region ingest and re-run (Phase 1).
+   tensors exist (`features/sequences.py`); **needs `pip install -e ".[learned]"`**
+   — torch is not currently installed in the dev environment.
+2. Detection latency: points-from-onset to first alarm (Phase 5). Pure
+   numpy over the existing per-point `is_attack` labels, so unblocked.
+3. Real MarineCadastre region ingest and re-run, including the robustness
+   sweeps, to see how far sensor noise moves the knees (Phase 1).

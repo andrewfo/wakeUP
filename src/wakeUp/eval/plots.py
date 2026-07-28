@@ -79,6 +79,48 @@ def plot_score_hist(
     return p
 
 
+def plot_robustness_curves(
+    sweep_df: pd.DataFrame,
+    out_path: str | Path,
+    metric: str = "pr_auc",
+    title: str = "Degradation with attack subtlety",
+) -> Path:
+    """Degradation curves: one panel per swept knob, one line per detector.
+
+    ``sweep_df`` is the frame returned by
+    :func:`~wakeUp.eval.robustness.run_robustness_sweeps`. The x axis is log
+    scaled because the severity ladders span an order of magnitude.
+    """
+    params = list(dict.fromkeys(sweep_df["param"]))
+    fig, axes = plt.subplots(
+        1, len(params), figsize=(4.2 * len(params), 4), dpi=140, squeeze=False
+    )
+    for ax, param in zip(axes[0], params):
+        sub = sweep_df[sweep_df["param"] == param]
+        atype = sub["attack_type"].iloc[0]
+        for i, (name, g) in enumerate(sub.groupby("detector", sort=True)):
+            g = g.sort_values("value")
+            ax.plot(
+                g["value"], g[metric], "-o", ms=4, lw=2,
+                color=_PALETTE[i % len(_PALETTE)], label=name,
+            )
+        base_rate = float(sub["n_pos"].iloc[0]) / float(sub["n"].iloc[0])
+        ax.axhline(base_rate, ls="--", lw=1, color="0.5", label=f"chance ({base_rate:.2f})")
+        ax.set_xscale("log")
+        ax.set_xlabel(param)
+        ax.set_ylabel(metric)
+        ax.set_ylim(0, 1.02)
+        ax.set_title(atype)
+        ax.grid(alpha=0.25)
+        ax.legend(frameon=False, fontsize=8)
+    fig.suptitle(title)
+    fig.tight_layout()
+    p = _ensure(out_path)
+    fig.savefig(p)
+    plt.close(fig)
+    return p
+
+
 def plot_window_example(
     clean_window: pd.DataFrame,
     attacked_window: pd.DataFrame,

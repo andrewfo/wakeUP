@@ -24,12 +24,20 @@ The defensible single-attack slice from the plan:
 python scripts/run_milestone.py --single-attack position_jump
 ```
 
+Degradation curves over attack subtlety:
+
+```bash
+python scripts/run_milestone.py --robustness
+```
+
 Outputs:
 - `data/processed/results.json` — overall + per-attack metrics for each detector
+- `data/processed/robustness.csv` — metrics vs attack severity (`--robustness`)
 - `figures/pr_curves.png`, `figures/score_hist_iforest.png`,
-  `figures/attack_example_jump.png`
+  `figures/attack_example_jump.png`, `figures/robustness_curves.png`
 
-`make milestone`, `make test`, and `make figures` wrap the same commands.
+`make milestone`, `make robustness`, `make test`, and `make figures` wrap the
+same commands.
 
 ## What it does
 
@@ -43,6 +51,8 @@ synthetic fleet ─► clean / resample / window ─► inject labeled attacks
                  baselines: KinematicRule · IsolationForest
                                     │
               per-attack PR-AUC / ROC-AUC / FPR@recall + figures
+                                    │
+                  robustness sweeps over attack subtlety
 ```
 
 The benchmark runs fully **offline** on a physics-based synthetic fleet
@@ -60,9 +70,26 @@ open AIS through `data.pipeline.load_marinecadastre_csv`.
 | gradual_drift | 0.64 | 0.97 |
 
 Physics rules saturate on gross violations but miss the subtle attacks; the
-learned baseline recovers them. Closing that gap with sequence models
-(LSTM-AE, Transformer) and stress-testing it with robustness sweeps over attack
-subtlety is the next phase.
+learned baseline recovers them.
+
+### Robustness: where each detector actually breaks
+
+The table above is one point on a curve. Sweeping attack severity
+(`--robustness`) shows the headline settings sit deep in the saturated regime —
+the informative region is one to three orders of magnitude subtler:
+
+| knob (subtle → gross) | KinematicRule PR-AUC | IsolationForest PR-AUC |
+|---|---|---|
+| `jump_km` 0.001 → 8.0 | 0.18 → 1.00 | 0.18 → 0.99 |
+| `speed_multiplier` 1.01 → 6.0 | 0.20 → 1.00 | 0.28 → 1.00 |
+| `drift_total_km` 0.02 → 3.0 | 0.17 → 0.77 | 0.19 → 0.92 |
+
+IsolationForest leads the physics rule by roughly a decade of severity on
+position jumps and across the whole drift ladder, but the two curves *cross* on
+`kinematic_impossible` near 1.5× — once a violation is gross, the rule that
+tests for it directly wins. Since the synthetic fleet is perfectly
+self-consistent, these knees are optimistic; real AIS noise should push them
+right. Sequence models (LSTM-AE, Transformer) and real-region ingest are next.
 
 ## Layout
 
@@ -74,7 +101,7 @@ src/wakeUp/
   attacks/          5 labeled attack injectors (the eval backbone)
   features/         kinematic-consistency feature extraction
   models/           baselines (rule detector, IsolationForest)
-  eval/             metrics + figure generation
+  eval/             metrics, robustness sweeps, figure generation
 scripts/run_milestone.py   end-to-end runner
 configs/default.yaml       experiment config
 tests/                     pytest suite (attacks tested hardest)
