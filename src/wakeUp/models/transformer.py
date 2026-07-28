@@ -239,3 +239,33 @@ class TransformerDetector:
         if self.threshold_ is None:
             raise RuntimeError("TransformerDetector must be fit before predict")
         return (self.score(data) > self.threshold_).astype(int)
+
+
+class ReconTransformerDetector(TransformerDetector):
+    """The Transformer's **unsupervised** arm — reconstruction only.
+
+    Identical encoder to :class:`TransformerDetector`, but it never touches the
+    classification head or the labels: the anomaly score is always per-window
+    reconstruction error. This is the matched control the ablation needs. The
+    supervised Transformer's decade-of-subtlety gain is confounded with its
+    access to labels; running the *same* architecture with no labels isolates
+    the "learned sequence representation" contribution from the "supervision"
+    contribution.
+
+    It declares ``supports_supervision = False`` so the held-out harness fits it
+    with a plain ``fit()`` (reconstruction) even while it hands the supervised
+    detectors their labels — the whole point of the arm is to see how far the
+    encoder gets without them.
+    """
+
+    #: Stay unsupervised even under a held-out protocol that offers labels.
+    supports_supervision = False
+
+    def fit(self, data, y=None, supervised: bool = False) -> "ReconTransformerDetector":
+        if supervised:
+            raise ValueError(
+                "ReconTransformerDetector is the unsupervised arm; use "
+                "TransformerDetector for the supervised head"
+            )
+        super().fit(data, supervised=False)
+        return self

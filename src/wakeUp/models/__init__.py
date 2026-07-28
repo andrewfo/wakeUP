@@ -1,13 +1,16 @@
 from wakeUp.models.baselines import (
     KinematicRuleDetector,
     IsolationForestDetector,
+    LogisticFeatureDetector,
 )
 
 __all__ = [
     "KinematicRuleDetector",
     "IsolationForestDetector",
+    "LogisticFeatureDetector",
     "LSTMAutoencoderDetector",
     "TransformerDetector",
+    "ReconTransformerDetector",
 ]
 
 
@@ -26,4 +29,8 @@ def __getattr__(name):
         from wakeUp.models.transformer import TransformerDetector
 
         return TransformerDetector
+    if name == "ReconTransformerDetector":
+        from wakeUp.models.transformer import ReconTransformerDetector
+
+        return ReconTransformerDetector
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

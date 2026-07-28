@@ -19,9 +19,11 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import IsolationForest
+from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 
 from wakeUp.config import ModelConfig
+from wakeUp.features import build_feature_matrix
 from wakeUp.features import kinematic as kin
 
 
@@ -92,3 +94,56 @@ class IsolationForestDetector:
     def predict(self, feat_df: pd.DataFrame) -> np.ndarray:
         X = self.scaler.transform(feat_df[self.columns_].to_numpy())
         return (self.model.predict(X) == -1).astype(int)
+
+
+class LogisticFeatureDetector:
+    """Supervised linear classifier over the window feature matrix.
+
+    The matched features-only control for the Transformer's supervised arm.
+    The Transformer's classification head is a single linear layer on the
+    mean-pooled encoder output, so the like-for-like hand-features comparison
+    is a linear classifier on the aggregate feature vector. Both see the same
+    labels, so any gap between them is attributable to the **learned sequence
+    representation**, not to supervision — which is exactly what the ablation
+    needs to isolate.
+
+    Like the sequence models it declares ``consumes_windows`` and takes the
+    per-point windows frame rather than a prebuilt matrix, so the held-out
+    harness can hand it labelled windows and it resolves features **and** labels
+    internally through the same ``build_feature_matrix`` ordering the harness
+    uses for the label vector. ``class_weight="balanced"`` mirrors the
+    Transformer's positive-class rebalancing (attacks are a ~15% minority).
+    """
+
+    #: Hand this detector the per-point windows frame, not the feature matrix.
+    consumes_windows = True
+    #: Supervised: the held-out harness passes ``supervised=True`` with labels.
+    supports_supervision = True
+
+    def __init__(self, cfg: ModelConfig | None = None):
+        self.cfg = cfg or ModelConfig()
+        self.scaler = StandardScaler()
+        self.model = LogisticRegression(
+            max_iter=1000, class_weight="balanced", random_state=self.cfg.seed
+        )
+        self.columns_: list[str] | None = None
+
+    def fit(self, windows: pd.DataFrame, y=None, supervised: bool = True):
+        feat_df, labels = build_feature_matrix(windows)
+        if y is not None:
+            labels = np.asarray(y)
+        self.columns_ = list(feat_df.columns)
+        X = self.scaler.fit_transform(feat_df.to_numpy())
+        self.model.fit(X, labels.astype(int))
+        return self
+
+    def score(self, windows: pd.DataFrame) -> np.ndarray:
+        """Predicted attack probability per window (larger == more anomalous)."""
+        if self.columns_ is None:
+            raise RuntimeError("LogisticFeatureDetector must be fit before score")
+        feat_df, _ = build_feature_matrix(windows)
+        X = self.scaler.transform(feat_df[self.columns_].to_numpy())
+        return self.model.predict_proba(X)[:, 1]
+
+    def predict(self, windows: pd.DataFrame) -> np.ndarray:
+        return (self.score(windows) > 0.5).astype(int)

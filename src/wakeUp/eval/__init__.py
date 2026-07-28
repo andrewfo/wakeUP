@@ -19,6 +19,11 @@ from wakeUp.eval.robustness import (
     run_robustness_sweeps,
     sweep_attack_severity,
 )
+from wakeUp.eval.ablation import (
+    ablation_cells,
+    run_ablation_sweeps,
+    run_ablation_table,
+)
 
 __all__ = [
     "evaluate_scores",
@@ -34,4 +39,7 @@ __all__ = [
     "sweep_attack_severity",
     "train_test_split_by_vessel",
     "window_labels",
+    "ablation_cells",
+    "run_ablation_sweeps",
+    "run_ablation_table",
 ]

@@ -12,10 +12,12 @@ scripts need `PYTHONPATH=src`:
 PYTHONPATH=src python -m pytest -q
 PYTHONPATH=src python scripts/run_milestone.py [--single-attack position_jump]
                                                [--lstm] [--transformer] [--robustness]
+PYTHONPATH=src python scripts/run_ablation.py  [--sweeps] [--lstm]
 ```
 
 `make test` / `make milestone` / `make robustness` / `make lstm` /
-`make transformer` wrap the same commands (and assume an installed package).
+`make transformer` / `make ablation` wrap the same commands (and assume an
+installed package).
 
 `--lstm` and `--transformer` need torch (`pip install -e ".[learned]"`). The
 installed build is **CPU-only** — PyPI's default Windows wheel no longer bundles
@@ -82,8 +84,32 @@ The synthetic fleet is *perfectly* self-consistent (no position noise), so all
 reported knees are optimistic; real AIS noise should push them right.
 
 When comparing the Transformer to the others, state that it is supervised. The
-defensible claim is "supervision buys ~a decade of attack subtlety here", not
-"the Transformer is a better anomaly detector".
+ablation (below) sharpened the defensible claim: **supervision** buys ~a decade
+of attack subtlety here, and a *linear classifier on the hand features* captures
+almost all of it — so the claim is about supervision, not the sequence model.
+The Transformer's own marginal edge over supervised features is small and shows
+up only at the extreme-subtle end of the discontinuity attacks (a 1.01× speed
+inflation, a 5 m jump). Never report "the Transformer is a better anomaly
+detector"; unsupervised, its reconstruction arm is the *worst* cell in the grid.
+
+**The ablation is what earns that claim.** `scripts/run_ablation.py` runs a 2×2
+over *representation* (hand features vs learned sequence) × *supervision*
+(unsupervised vs supervised), all four cells under one held-out-by-vessel split:
+
+|                  | unsupervised       | supervised                |
+|------------------|--------------------|---------------------------|
+| hand features    | IsolationForest    | `LogisticFeatureDetector` |
+| learned sequence | `ReconTransformer` | `TransformerDetector`     |
+
+The two supervised cells share a **linear** head (sklearn logistic vs the
+Transformer's linear `cls_head` on the pooled encoding), so left↔right isolates
+supervision and top↔bottom isolates the learned representation with the
+classifier held fixed. `ReconTransformerDetector` is the matched control: same
+encoder as the Transformer but `supports_supervision = False`, so the held-out
+harness fits it reconstruction-only even while it hands the supervised cells
+their labels. `LogisticFeatureDetector` sets `consumes_windows = True` and builds
+features internally, so it slots into the same harness branch as the sequence
+models with no special-casing.
 
 ## Reporting results
 

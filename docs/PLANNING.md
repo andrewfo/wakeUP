@@ -140,7 +140,12 @@ per-point frame, not the aggregated feature matrix) and `supports_supervision`
       stays comparable; `sweep_attack_severity(holdout=True)` does the same
       inside the sweeps.
 - [ ] Detection latency (points-from-onset to first alarm). ⬜
-- [ ] Ablations: features-only vs learned vs hybrid. ⬜
+- [x] Ablation: features-only vs learned × unsupervised vs supervised, as a 2×2
+      under one held-out split (`eval/ablation.py`, `scripts/run_ablation.py`).
+      Decomposes the Transformer's gain into a learned-representation axis and a
+      supervision axis; the two supervised cells share a linear head so the
+      comparison holds the classifier fixed. Hybrid (features ⊕ learned
+      embedding) still open. ⬜(hybrid)
 
 ## Phase 6 — Deliverable 🔨
 
@@ -252,16 +257,69 @@ perfectly self-consistent, these knees are optimistic; real AIS position noise
 should push them right, and quantifying that shift is the point of the Phase 1
 real-data ingest.
 
+**Ablation result (synthetic, seed 1234, `run_ablation.py --sweeps`) — the one
+that reframes the headline.** The 2×2 over representation × supervision, all
+four cells on one held-out split. At the default (saturated) severities three of
+the four cells hit 1.00 PR-AUC on every attack; only the *unsupervised learned*
+cell lags (overall 0.75), so the grid has to be read on the sweeps.
+
+Held-out PR-AUC across the subtlety ladders (subtle → gross):
+
+| knob | value | IForest (feat/uns) | Logistic (feat/sup) | ReconTf (seq/uns) | Transformer (seq/sup) |
+|---|---|---|---|---|---|
+| `jump_km` | 0.005 | 0.27 | **0.64** | 0.19 | **0.76** |
+| | 0.010 | 0.56 | **0.97** | 0.31 | **0.96** |
+| | 0.050 | 0.93 | **1.00** | 0.72 | **1.00** |
+| `speed_multiplier` | 1.01 | 0.25 | 0.67 | 0.17 | **0.97** |
+| | 1.05 | 0.54 | **1.00** | 0.33 | **1.00** |
+| `drift_total_km` | 0.05 | 0.27 | **0.81** | 0.17 | **0.82** |
+| | 0.10 | 0.58 | **0.99** | 0.25 | **0.99** |
+
+The decomposition it forces:
+
+1. **The decade-of-subtlety gain is supervision, not the learned
+   representation.** A *linear classifier on the 27 hand features* (Logistic)
+   tracks the supervised Transformer almost column-for-column — jump, kinematic,
+   and drift knees all land within noise of each other. The earlier
+   "Transformer ≫ IsolationForest" sweep was a supervised model measured against
+   unsupervised baselines; with the matched supervised-features control in the
+   grid, most of that gap moves onto the *supervision* axis. The honest headline
+   is now "**supervision** buys ~a decade of subtlety here, and hand features
+   capture almost all of it" — the sequence model is not what earns it.
+2. **The learned representation's marginal value is small and localised.**
+   Holding supervision fixed (Logistic → Transformer), the encoder adds a real
+   but narrow edge only at the extreme-subtle end of the *discontinuity* attacks
+   — `speed_multiplier` 1.01× (0.97 vs 0.67) and `jump_km` 0.005 (0.76 vs 0.64),
+   where per-point structure survives that the window aggregates smooth away. On
+   `gradual_drift` the two are indistinguishable.
+3. **Unsupervised, the learned arm is the worst cell everywhere.** ReconTf sits
+   below unsupervised IsolationForest on every ladder and is near-blind to smooth
+   offsets (drift 0.15 → 0.70 across its whole range), saturating only on
+   `kinematic_impossible`. This reproduces the LSTM-AE blind spot exactly:
+   reconstruction sees discontinuities and cannot see a uniform shift.
+
+So the efficient frontier on this benchmark is **supervised hand features**, not
+the Transformer — a cheaper model reaching the same knees. The Transformer earns
+its place only where per-point detail matters at the very subtle end, and that
+is the defensible, narrow claim to make for it. The open question the ablation
+raises is whether a **hybrid** (features ⊕ pooled encoder embedding) recovers
+that thin learned edge on top of the features' supervision without paying full
+sequence-model cost — the next ablation slice. All knees are optimistic on the
+self-consistent synthetic fleet; the Phase 1 real-data ingest is what tests
+whether the features-vs-learned gap widens once positions carry sensor noise.
+
 ## Next actions
 
-1. **Ablation: features-only vs learned vs hybrid** (Phase 5), including an
-   *unsupervised* Transformer arm. This is now the highest-value step: the
-   supervised Transformer's decade-of-subtlety gain is currently confounded
-   with its access to labels, and only the ablation separates "sequence model"
-   from "supervision".
+1. ~~**Ablation: features-only vs learned**, including an *unsupervised*
+   Transformer arm.~~ **Done** — the 2×2 (`scripts/run_ablation.py`) separates
+   the learned representation from supervision; results below. Remaining slice:
+   the **hybrid** cell (IsolationForest / logistic over hand features ⊕ pooled
+   encoder embedding), which would show whether the two representations are
+   complementary rather than substitutes.
 2. Detection latency: points-from-onset to first alarm (Phase 5). Pure
    numpy over the existing per-point `is_attack` labels, so unblocked.
 3. Real MarineCadastre region ingest and re-run, including the robustness
-   sweeps, to see how far sensor noise moves the knees (Phase 1).
+   sweeps and the ablation, to see how far sensor noise moves the knees
+   (Phase 1).
 4. **Stretch:** temporal GNN over co-located vessels (Phase 4). Needs the
    `gnn` extra and probably the PostGIS neighbour queries from Phase 1.
