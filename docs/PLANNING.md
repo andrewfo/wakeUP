@@ -81,15 +81,17 @@ spoofer also fakes a self-consistent SOG/COG.
 - [x] Unit tests assert labels, physical detectability, shape preservation,
       determinism, and contamination rate (`tests/test_attacks.py`).
 
-## Phase 3 — Features ✅ (kinematic) / ⬜ (sequence tensors)
+## Phase 3 — Features ✅
 
 - [x] Per-point kinematics: implied speed (Δpos), acceleration, turn-rate,
       and the key **consistency residuals** — reported SOG vs implied speed,
       reported COG vs implied bearing — plus gap detection.
 - [x] Fixed-length window feature vector (robust aggregates + fraction of
       points over each physical limit): 27 features, stable column order.
-- [ ] Sequence tensors `(window, point, channel)` normalised per-channel for
-      the learned models. ⬜
+- [x] Sequence tensors `(window, point, channel)` normalised per-channel for
+      the learned models (`features/sequences.py`: `SequenceTensorizer` with
+      train-only fit/transform stats; 7 kinematic channels, tested for shape,
+      alignment, finiteness, determinism, and no train/test leakage).
 
 ## Phase 4 — Models 🔨
 
@@ -140,6 +142,8 @@ what will make the benchmark discriminative rather than saturated.
 
 ## Next actions
 
-1. Sequence tensors + LSTM-autoencoder (Phase 3/4).
+1. LSTM-autoencoder over the sequence tensors — reconstruction error as the
+   anomaly score, `fit`/`score` like the other detectors (Phase 4). Sequence
+   tensors now exist (`features/sequences.py`), so this is unblocked.
 2. Robustness sweep harness over attack subtlety (Phase 5).
 3. Real MarineCadastre region ingest and re-run (Phase 1).
