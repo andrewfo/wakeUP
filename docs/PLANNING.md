@@ -39,14 +39,17 @@ PyTorch Geometric (temporal GNN).
 - [x] `configs/` (YAML today; Hydra structured configs planned — dataclass
       config loader already mirrors the Hydra group layout).
 - [x] `tests/`, `notebooks/`, `scripts/`.
-- [x] `Makefile` targets: `data`, `features`, `train`, `eval`, `figures`,
-      `milestone`, `test`.
+- [x] `Makefile` targets: `install`, `data`, `features`, `train`, `eval`,
+      `figures`, `milestone`, `milestone-jump`, `robustness`, `lstm`,
+      `transformer`, `test`, `lint`, `clean`.
 - [x] Deterministic seeds (`config.set_global_seed`).
 - [ ] Logging: no run logger yet — results land as `results.json` /
       `robustness.csv` artefacts. CSV run logger, then W&B behind an optional
       flag. ⬜
-- **Deps:** `pyproject.toml` with a minimal core and `[learned]`, `[config]`,
-  `[dev]` extras so the milestone installs light.
+- **Deps:** `pyproject.toml` with a minimal core and `[learned]` (torch),
+  `[gnn]` (torch-geometric, Phase 4 stretch only), `[config]`, `[dev]` extras
+  so the milestone installs light. The core path — synthetic data, attacks,
+  features, rule + IsolationForest, figures — needs no torch.
 
 ## Phase 1 — Data ✅ (synthetic) / 🔨 (real ingest)
 
@@ -95,7 +98,7 @@ spoofer also fakes a self-consistent SOG/COG.
       train-only fit/transform stats; 7 kinematic channels, tested for shape,
       alignment, finiteness, determinism, and no train/test leakage).
 
-## Phase 4 — Models 🔨
+## Phase 4 — Models ✅ (rule / iforest / LSTM-AE / Transformer) / ⬜ (GNN stretch)
 
 - [x] Kinematic-threshold rule detector (worst-violation ratio → ranking).
 - [x] IsolationForest over the window feature matrix (scaled).
@@ -141,7 +144,9 @@ per-point frame, not the aggregated feature matrix) and `supports_supervision`
 
 ## Phase 6 — Deliverable 🔨
 
-- [x] `figures/` auto-generated (PR curves, score histogram, worked example).
+- [x] `figures/` auto-generated: `pr_curves.png`, `score_hist_iforest.png`,
+      `attack_example_jump.png`, and `robustness_curves.png` (log-x degradation
+      panel per swept knob, written by `--robustness`).
 - [x] README with reproduce-in-one-command.
 - [ ] Paper skeleton: methods, benchmark table, robustness plots. ⬜
 

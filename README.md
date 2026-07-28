@@ -2,14 +2,17 @@
 
 Detection of **spoofed / anomalous AIS vessel tracks** — position jumps,
 kinematically impossible motion, identity swaps, replay, and gradual drift —
-via kinematic-consistency features and (progressively) learned sequence models.
-The repo is a *reproducible benchmark*: a labeled synthetic attack generator,
-a source-agnostic feature pipeline, baseline detectors, and auto-generated
-paper figures.
+via kinematic-consistency features and learned sequence models. The repo is a
+*reproducible benchmark*: a labeled synthetic attack generator, a
+source-agnostic feature pipeline, four detectors, robustness sweeps over attack
+subtlety, and auto-generated paper figures.
 
-> Status: **first milestone delivered** — Phases 0–2 + IsolationForest baseline
-> + attacks end-to-end, plotted. See [`docs/PLANNING.md`](docs/PLANNING.md) for
-> the full phase-by-phase plan and what's next.
+> Status: **Phases 0–4 delivered** — synthetic fleet, five labeled attacks,
+> kinematic features + sequence tensors, and four detectors (physics rule,
+> IsolationForest, LSTM autoencoder, Transformer), with per-attack metrics and
+> degradation curves. Open: the features-vs-learned-vs-hybrid ablation,
+> detection latency, and real-region ingest. See
+> [`docs/PLANNING.md`](docs/PLANNING.md) for the phase-by-phase plan.
 
 ## Reproduce in one command
 
