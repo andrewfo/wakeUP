@@ -99,7 +99,11 @@ spoofer also fakes a self-consistent SOG/COG.
 
 - [x] Kinematic-threshold rule detector (worst-violation ratio → ranking).
 - [x] IsolationForest over the window feature matrix (scaled).
-- [ ] LSTM-autoencoder (reconstruction error as anomaly score). ⬜
+- [x] LSTM-autoencoder over the sequence tensors, reconstruction error as the
+      anomaly score (`models/sequence_ae.py`). Accepts either the per-point
+      windows frame (tensorising internally with train-only stats) or a
+      prebuilt `(N, L, C)` array; CPU + explicit-`rng` batching so runs are
+      bitwise reproducible. Opt-in via `--lstm`; needs the `learned` extra.
 - [ ] **Main:** Transformer encoder over track windows, reconstruction and
       classification heads. ⬜
 - [ ] **Stretch:** temporal GNN over co-located vessels for spatial context. ⬜
@@ -146,6 +150,28 @@ them (≈ 0.97 each). That gap is the intended story and the motivation for the
 learned sequence models in Phase 4 — and the robustness sweeps in Phase 5 are
 what make the benchmark discriminative rather than saturated.
 
+**LSTM-autoencoder result (synthetic, seed 1234, `--lstm`) — a negative one.**
+Per-attack PR-AUC / ROC-AUC: kinematic_impossible 1.00 / 1.00, identity_swap
+0.68 / 0.95, replay 0.66 / 0.99, position_jump 0.35 / 0.93, gradual_drift
+0.04 / 0.58 (overall 0.74 / 0.89). It is **beaten by IsolationForest on every
+attack**, and on gradual drift it is at chance.
+
+This is a property of the objective, not an untrained model: the loss
+converges (0.81 → 0.50), and sweeping capacity from `lstm_hidden` 8 to 64 and
+epochs 40 to 150 leaves drift PR-AUC pinned at 0.04–0.05 while *more* capacity
+makes it slightly worse (0.049 → 0.039) — the textbook autoencoder-for-anomaly-
+detection failure, where the model learns to reconstruct the anomalies too.
+
+The per-attack pattern is the informative part: reconstruction error catches
+**discontinuities** (kinematic_impossible saturates, replay/identity_swap reach
+0.99/0.95 ROC) and is blind to **smooth global offsets** — a gradual drift
+perturbs every channel by a near-constant amount, which a sequence model
+reconstructs exactly as easily as clean motion. Aggregate features see that
+offset as an obvious shift in `speed_resid_mean`; a reconstruction objective
+cannot. That argues the Transformer should carry a *classification* head
+alongside reconstruction, and it is the concrete motivation for the
+features-vs-learned-vs-hybrid ablation.
+
 **Robustness result (synthetic, seed 1234, `--robustness`).** PR-AUC vs attack
 severity, base rate 0.15. The headline settings sit far into the saturated
 regime; the informative region is one to three orders of magnitude subtler:
@@ -171,11 +197,14 @@ real-data ingest.
 
 ## Next actions
 
-1. LSTM-autoencoder over the sequence tensors — reconstruction error as the
-   anomaly score, `fit`/`score` like the other detectors (Phase 4). Sequence
-   tensors exist (`features/sequences.py`); **needs `pip install -e ".[learned]"`**
-   — torch is not currently installed in the dev environment.
+1. **Main model:** Transformer encoder over the sequence tensors with *both*
+   reconstruction and classification heads (Phase 4). The LSTM-AE result above
+   is the argument for the classification head: a pure reconstruction
+   objective is structurally blind to gradual drift.
 2. Detection latency: points-from-onset to first alarm (Phase 5). Pure
    numpy over the existing per-point `is_attack` labels, so unblocked.
-3. Real MarineCadastre region ingest and re-run, including the robustness
+3. Ablation: features-only vs learned vs hybrid (Phase 5) — the LSTM-AE and
+   IsolationForest per-attack profiles are near-complementary, so the hybrid
+   arm is worth measuring rather than assuming.
+4. Real MarineCadastre region ingest and re-run, including the robustness
    sweeps, to see how far sensor noise moves the knees (Phase 1).

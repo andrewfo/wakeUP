@@ -4,13 +4,14 @@
 
 PYTHON ?= python
 
-.PHONY: help install data features train eval figures milestone milestone-jump robustness test lint clean
+.PHONY: help install data features train eval figures milestone milestone-jump robustness lstm test lint clean
 
 help:
 	@echo "Targets:"
 	@echo "  install   install package + dev deps (editable)"
 	@echo "  milestone run end-to-end first-milestone slice (data+attacks+baseline+figures)"
 	@echo "  robustness run the attack-subtlety sweeps + degradation curves"
+	@echo "  lstm      run the milestone with the LSTM autoencoder ([learned] extra)"
 	@echo "  test      run the test suite"
 	@echo "  figures   regenerate figures from the last run"
 	@echo "  clean     remove generated data/figures/caches"
@@ -42,6 +43,10 @@ milestone-jump:
 # per severity, so it is slower than the plain milestone run.
 robustness:
 	$(PYTHON) scripts/run_milestone.py --config configs/default.yaml --robustness
+
+# Adds the LSTM autoencoder (Phase 4). Needs: pip install -e ".[learned]"
+lstm:
+	$(PYTHON) scripts/run_milestone.py --config configs/default.yaml --lstm
 
 test:
 	$(PYTHON) -m pytest

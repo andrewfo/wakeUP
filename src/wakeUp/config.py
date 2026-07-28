@@ -63,6 +63,14 @@ class ModelConfig:
     seed: int = 0
     iforest_estimators: int = 300
     iforest_contamination: float = 0.1
+    # LSTM autoencoder (Phase 4). Small by design: the windows are 32 points of
+    # 7 channels, so a wider model overfits the attacked minority it is meant
+    # to reconstruct badly.
+    lstm_hidden: int = 32
+    lstm_epochs: int = 40
+    lstm_lr: float = 1e-3
+    lstm_batch_size: int = 64
+    lstm_contamination: float = 0.1
 
 
 @dataclass

@@ -64,13 +64,24 @@ DEFAULT_SWEEPS: dict[str, list[float]] = {
 DetectorFactories = Mapping[str, Callable[[], object]]
 
 
-def default_detectors(model_cfg: ModelConfig | None = None) -> dict[str, Callable[[], object]]:
-    """The milestone's two baselines, as factories."""
+def default_detectors(
+    model_cfg: ModelConfig | None = None, include_lstm: bool = False
+) -> dict[str, Callable[[], object]]:
+    """The milestone's baselines, as factories.
+
+    ``include_lstm`` adds the LSTM autoencoder; it retrains at every sweep
+    point, so it is opt-in and needs the ``learned`` extra.
+    """
     cfg = model_cfg or ModelConfig()
-    return {
+    factories: dict[str, Callable[[], object]] = {
         "KinematicRule": lambda: KinematicRuleDetector(),
         "IsolationForest": lambda: IsolationForestDetector(cfg),
     }
+    if include_lstm:
+        from wakeUp.models import LSTMAutoencoderDetector
+
+        factories["LSTM-AE"] = lambda: LSTMAutoencoderDetector(cfg)
+    return factories
 
 
 def sweep_attack_severity(
@@ -105,8 +116,12 @@ def sweep_attack_severity(
         attacked = build_attacked_dataset(windows, cfg_v, attack_types=[atype])
         feat_df, labels = build_feature_matrix(attacked)
         for name, make in factories.items():
-            det = make().fit(feat_df)
-            metrics = evaluate_scores(labels, det.score(feat_df), recall_target)
+            det = make()
+            # Sequence models want the per-point frame; both groupings sort by
+            # window_id, so scores stay aligned with `labels` either way.
+            payload = attacked if getattr(det, "consumes_windows", False) else feat_df
+            det.fit(payload)
+            metrics = evaluate_scores(labels, det.score(payload), recall_target)
             rows.append(
                 {
                     "attack_type": atype.value,

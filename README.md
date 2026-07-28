@@ -24,10 +24,11 @@ The defensible single-attack slice from the plan:
 python scripts/run_milestone.py --single-attack position_jump
 ```
 
-Degradation curves over attack subtlety:
+Degradation curves over attack subtlety, and the sequence model:
 
 ```bash
 python scripts/run_milestone.py --robustness
+pip install -e ".[learned]" && python scripts/run_milestone.py --lstm
 ```
 
 Outputs:
@@ -48,7 +49,7 @@ synthetic fleet ─► clean / resample / window ─► inject labeled attacks
                                     │
                      kinematic-consistency features
                                     │
-                 baselines: KinematicRule · IsolationForest
+        detectors: KinematicRule · IsolationForest · LSTM-AE
                                     │
               per-attack PR-AUC / ROC-AUC / FPR@recall + figures
                                     │
@@ -61,16 +62,28 @@ open AIS through `data.pipeline.load_marinecadastre_csv`.
 
 ## Representative result (synthetic, seed 1234)
 
-| attack | KinematicRule PR-AUC | IsolationForest PR-AUC |
-|---|---|---|
-| position_jump | 1.00 | 1.00 |
-| kinematic_impossible | 1.00 | 1.00 |
-| replay | 1.00 | 1.00 |
-| identity_swap | 0.77 | 0.97 |
-| gradual_drift | 0.64 | 0.97 |
+| attack | KinematicRule | IsolationForest | LSTM-AE |
+|---|---|---|---|
+| position_jump | 1.00 | 1.00 | 0.35 |
+| kinematic_impossible | 1.00 | 1.00 | 1.00 |
+| replay | 1.00 | 1.00 | 0.66 |
+| identity_swap | 0.77 | 0.97 | 0.68 |
+| gradual_drift | 0.64 | 0.97 | 0.04 |
+
+(PR-AUC. LSTM-AE via `--lstm`, needs the `learned` extra.)
 
 Physics rules saturate on gross violations but miss the subtle attacks; the
-learned baseline recovers them.
+IsolationForest baseline recovers them.
+
+**The LSTM autoencoder loses to both** — reported as-is rather than tuned away.
+Its loss converges and the result is stable across `lstm_hidden` 8→64 and
+40→150 epochs (more capacity makes drift slightly *worse*), so it is a property
+of the objective: reconstruction error flags **discontinuities** but is blind to
+**smooth global offsets**. A gradual drift shifts every channel by a
+near-constant amount, which a sequence model reconstructs as easily as clean
+motion, while the aggregate features see an obvious `speed_resid_mean` shift.
+That is why the planned Transformer carries a classification head alongside
+reconstruction.
 
 ### Robustness: where each detector actually breaks
 
@@ -100,7 +113,7 @@ src/wakeUp/
   data/             synthetic generator + clean/resample/window pipeline
   attacks/          5 labeled attack injectors (the eval backbone)
   features/         kinematic-consistency feature extraction
-  models/           baselines (rule detector, IsolationForest)
+  models/           rule detector, IsolationForest, LSTM autoencoder
   eval/             metrics, robustness sweeps, figure generation
 scripts/run_milestone.py   end-to-end runner
 configs/default.yaml       experiment config

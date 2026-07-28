@@ -46,6 +46,11 @@ def main() -> None:
         help="restrict to one attack type (defensible slice); default = all five",
     )
     ap.add_argument(
+        "--lstm",
+        action="store_true",
+        help="also fit the LSTM autoencoder (requires the [learned] extra)",
+    )
+    ap.add_argument(
         "--robustness",
         action="store_true",
         help="also run the attack-subtlety sweeps (slower: rebuilds the dataset per severity)",
@@ -96,6 +101,14 @@ def main() -> None:
         "KinematicRule": rule.score(feat_df),
         "IsolationForest": iforest.score(feat_df),
     }
+    if args.lstm:
+        # Sequence model: consumes the per-point frame. Both it and the feature
+        # matrix group by sorted window_id, so scores align with `labels`.
+        from wakeUp.models import LSTMAutoencoderDetector
+
+        print("      + LSTM autoencoder (torch) ...")
+        ae = LSTMAutoencoderDetector(cfg.model).fit(attacked)
+        scores["LSTM-AE"] = ae.score(attacked)
 
     print("[6/6] metrics + figures ...")
     results = {}
@@ -130,7 +143,9 @@ def main() -> None:
     if args.robustness:
         print("\n[+] robustness sweeps over attack subtlety ...")
         sweep = run_robustness_sweeps(
-            windows, attack_cfg=cfg.attack, detectors=default_detectors(cfg.model)
+            windows,
+            attack_cfg=cfg.attack,
+            detectors=default_detectors(cfg.model, include_lstm=args.lstm),
         )
         sweep.to_csv(proc_dir / "robustness.csv", index=False)
         plot_robustness_curves(sweep, fig_dir / "robustness_curves.png")
