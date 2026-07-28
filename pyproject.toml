@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wakeguard"
+version = "0.1.0"
+description = "Detection of spoofed / anomalous AIS vessel tracks via kinematic consistency + sequence models."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "andrewfo" }]
+license = { text = "MIT" }
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.1",
+    "pyarrow>=14",
+    "scikit-learn>=1.4",
+    "matplotlib>=3.8",
+]
+
+[project.optional-dependencies]
+# Learned models land in later phases; kept optional so the milestone slice
+# installs and runs with a minimal footprint.
+learned = ["torch>=2.2", "torch-geometric>=2.5"]
+config = ["hydra-core>=1.3", "pyyaml>=6"]
+dev = ["pytest>=8", "pytest-cov", "ruff"]
+
+[project.scripts]
+wakeguard-milestone = "scripts.run_milestone:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

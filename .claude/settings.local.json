@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem -Force C:\\\\Users\\\\andrew\\\\wakeUp | Select-Object Name, Length; Write-Output \"---git---\"; git -C C:\\\\Users\\\\andrew\\\\wakeUp status 2>$null; Write-Output \"---tools---\"; foreach \\($t in @\\('python','py','git','uv','poetry'\\)\\) { $c = Get-Command $t -ErrorAction SilentlyContinue; if \\($c\\) { \"$t -> $\\($c.Source\\)\" } else { \"$t -> MISSING\" } })"
+    ]
+  }
+}

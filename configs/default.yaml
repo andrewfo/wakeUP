@@ -1,0 +1,31 @@
+# Default experiment config for wakeguard.
+# Loaded by src/wakeguard/config.py (overlays the dataclass defaults if
+# PyYAML is installed; otherwise the built-in defaults are used).
+
+data:
+  seed: 1234
+  n_vessels: 40
+  duration_hours: 12.0
+  cadence_s: 60          # resample cadence (seconds)
+  min_track_points: 30   # drop tracks shorter than this
+  window_len: 32         # points per trajectory window
+  window_stride: 16      # stride between windows (50% overlap)
+  region_bbox: [36.0, -75.5, 37.5, -73.5]   # lat_min, lon_min, lat_max, lon_max
+
+attack:
+  seed: 7
+  contamination: 0.15    # fraction of windows corrupted
+  jump_km: 8.0           # position-jump displacement
+  drift_total_km: 3.0    # gradual-drift end offset
+  speed_multiplier: 6.0  # kinematic-impossible spacing inflation
+
+model:
+  seed: 0
+  iforest_estimators: 300
+  iforest_contamination: 0.1
+
+paths:
+  raw: data/raw
+  interim: data/interim
+  processed: data/processed
+  figures: figures
