@@ -1,4 +1,4 @@
-"""wakeguard — AIS spoofing / anomaly detection benchmark.
+"""wakeUp — AIS spoofing / anomaly detection benchmark.
 
 Package layout:
     data/      ingest, clean, resample, window synthetic + real AIS

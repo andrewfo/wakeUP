@@ -1,5 +1,5 @@
-from wakeguard.data.synthetic_ais import generate_fleet
-from wakeguard.data.pipeline import (
+from wakeUp.data.synthetic_ais import generate_fleet
+from wakeUp.data.pipeline import (
     clean_ais,
     resample_track,
     segment_windows,

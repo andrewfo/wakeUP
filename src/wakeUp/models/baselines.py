@@ -21,8 +21,8 @@ import pandas as pd
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
 
-from wakeguard.config import ModelConfig
-from wakeguard.features import kinematic as kin
+from wakeUp.config import ModelConfig
+from wakeUp.features import kinematic as kin
 
 
 class KinematicRuleDetector:
@@ -84,7 +84,7 @@ class IsolationForestDetector:
         """Anomaly score, larger == more anomalous.
 
         sklearn's ``score_samples`` returns *higher for inliers*, so we negate
-        to keep the wakeguard convention (larger == more likely spoofed).
+        to keep the wakeUp convention (larger == more likely spoofed).
         """
         X = self.scaler.transform(feat_df[self.columns_].to_numpy())
         return -self.model.score_samples(X)

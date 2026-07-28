@@ -14,7 +14,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from wakeguard.config import DataConfig
+from wakeUp.config import DataConfig
 
 SCHEMA = ["mmsi", "timestamp", "lat", "lon", "sog", "cog", "heading"]
 
@@ -34,7 +34,7 @@ _MARINECADASTRE_MAP = {
 
 
 def load_marinecadastre_csv(path: str | Path) -> pd.DataFrame:
-    """Load a MarineCadastre AIS CSV into the wakeguard schema."""
+    """Load a MarineCadastre AIS CSV into the wakeUp schema."""
     df = pd.read_csv(path)
     df = df.rename(columns=_MARINECADASTRE_MAP)
     keep = [c for c in SCHEMA if c in df.columns]

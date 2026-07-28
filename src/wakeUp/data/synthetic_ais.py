@@ -20,8 +20,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from wakeguard import geo
-from wakeguard.config import DataConfig
+from wakeUp import geo
+from wakeUp.config import DataConfig
 
 # Broad, plausible cruising speeds (knots) for a mixed fleet.
 _SPEED_RANGE_KN = (6.0, 18.0)

@@ -21,7 +21,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from wakeguard import geo
+from wakeUp import geo
 
 # Physical plausibility ceilings for a mixed commercial fleet.
 MAX_PLAUSIBLE_SPEED_KN = 40.0

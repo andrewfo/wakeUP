@@ -1,6 +1,6 @@
 import numpy as np
 
-from wakeguard import geo
+from wakeUp import geo
 
 
 def test_haversine_known_distance():

@@ -1,4 +1,4 @@
-from wakeguard.models.baselines import (
+from wakeUp.models.baselines import (
     KinematicRuleDetector,
     IsolationForestDetector,
 )

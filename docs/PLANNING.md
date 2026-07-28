@@ -1,4 +1,4 @@
-# wakeguard — Detailed Planning Document
+# wakeUp — Detailed Planning Document
 
 **Goal.** Detect spoofed / anomalous AIS vessel tracks — position jumps,
 kinematically impossible motion, identity swaps, replay, and gradual drift —
@@ -17,7 +17,7 @@ PyTorch Geometric (temporal GNN).
 
 1. **The attack generator is the eval backbone.** Every reported number is
    only as trustworthy as the labels. The injector module
-   (`src/wakeguard/attacks/`) is parameterised, deterministic, and unit-tested
+   (`src/wakeUp/attacks/`) is parameterised, deterministic, and unit-tested
    harder than anything else in the repo.
 2. **Source-agnostic pipeline.** Everything after ingest operates on one
    canonical schema (`mmsi, timestamp, lat, lon, sog, cog, heading`), so
@@ -35,7 +35,7 @@ PyTorch Geometric (temporal GNN).
 
 ## Phase 0 — Scaffold ✅
 
-- [x] `src/wakeguard/` package (data / attacks / features / models / eval).
+- [x] `src/wakeUp/` package (data / attacks / features / models / eval).
 - [x] `configs/` (YAML today; Hydra structured configs planned — dataclass
       config loader already mirrors the Hydra group layout).
 - [x] `tests/`, `notebooks/`, `scripts/`.

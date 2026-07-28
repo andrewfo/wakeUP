@@ -16,7 +16,7 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 from sklearn.metrics import precision_recall_curve  # noqa: E402
 
-from wakeguard.features import kinematic as kin  # noqa: E402
+from wakeUp.features import kinematic as kin  # noqa: E402
 
 # A small colourblind-safe categorical set (Okabe–Ito subset).
 _PALETTE = ["#0072B2", "#D55E00", "#009E73", "#CC79A7", "#E69F00", "#56B4E9"]

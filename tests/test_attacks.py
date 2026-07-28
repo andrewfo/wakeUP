@@ -13,8 +13,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from wakeguard import geo
-from wakeguard.attacks import (
+from wakeUp import geo
+from wakeUp.attacks import (
     AttackType,
     inject_position_jump,
     inject_kinematic_impossible,
@@ -22,8 +22,8 @@ from wakeguard.attacks import (
     inject_gradual_drift,
     build_attacked_dataset,
 )
-from wakeguard.attacks.injectors import inject_identity_swap
-from wakeguard.features.kinematic import point_features
+from wakeUp.attacks.injectors import inject_identity_swap
+from wakeUp.features.kinematic import point_features
 
 
 def _implied_max_speed(win):

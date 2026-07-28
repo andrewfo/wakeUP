@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from wakeguard.config import DataConfig, AttackConfig
-from wakeguard.data import generate_fleet, build_dataset
+from wakeUp.config import DataConfig, AttackConfig
+from wakeUp.data import generate_fleet, build_dataset
 
 
 @pytest.fixture(scope="session")

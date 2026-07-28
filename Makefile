@@ -1,4 +1,4 @@
-# wakeguard — reproducible pipeline targets.
+# wakeUp — reproducible pipeline targets.
 # On Windows without `make`, run the underlying `python` commands directly
 # (see README "Reproduce in one command").
 

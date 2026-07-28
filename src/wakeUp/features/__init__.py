@@ -1,4 +1,4 @@
-from wakeguard.features.kinematic import (
+from wakeUp.features.kinematic import (
     point_features,
     window_feature_vector,
     build_feature_matrix,

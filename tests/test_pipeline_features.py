@@ -3,14 +3,14 @@
 import numpy as np
 import pandas as pd
 
-from wakeguard.config import DataConfig
-from wakeguard.data.pipeline import clean_ais, resample_track, segment_windows
-from wakeguard.features import build_feature_matrix, FEATURE_NAMES
-from wakeguard.features.kinematic import point_features
+from wakeUp.config import DataConfig
+from wakeUp.data.pipeline import clean_ais, resample_track, segment_windows
+from wakeUp.features import build_feature_matrix, FEATURE_NAMES
+from wakeUp.features.kinematic import point_features
 
 
 def test_clean_drops_dupes_and_short(small_cfg):
-    from wakeguard.data import generate_fleet
+    from wakeUp.data import generate_fleet
 
     raw = generate_fleet(small_cfg)
     n_raw_dupes = raw.duplicated(subset=["mmsi", "timestamp"]).sum()
@@ -22,7 +22,7 @@ def test_clean_drops_dupes_and_short(small_cfg):
 
 
 def test_resample_regular_cadence(small_cfg):
-    from wakeguard.data import generate_fleet
+    from wakeUp.data import generate_fleet
 
     raw = generate_fleet(small_cfg)
     cleaned = clean_ais(raw, small_cfg)
@@ -42,8 +42,8 @@ def test_windows_have_fixed_length(windows, small_cfg):
 
 
 def test_feature_matrix_shape_and_names(windows):
-    from wakeguard.attacks import build_attacked_dataset
-    from wakeguard.config import AttackConfig
+    from wakeUp.attacks import build_attacked_dataset
+    from wakeUp.config import AttackConfig
 
     attacked = build_attacked_dataset(windows, AttackConfig())
     feat, labels = build_feature_matrix(attacked)

@@ -1,5 +1,5 @@
-# Default experiment config for wakeguard.
-# Loaded by src/wakeguard/config.py (overlays the dataclass defaults if
+# Default experiment config for wakeUp.
+# Loaded by src/wakeUp/config.py (overlays the dataclass defaults if
 # PyYAML is installed; otherwise the built-in defaults are used).
 
 data:

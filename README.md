@@ -1,4 +1,4 @@
-# wakeguard
+# wakeUp
 
 Detection of **spoofed / anomalous AIS vessel tracks** — position jumps,
 kinematically impossible motion, identity swaps, replay, and gradual drift —
@@ -67,7 +67,7 @@ subtlety is the next phase.
 ## Layout
 
 ```
-src/wakeguard/
+src/wakeUp/
   geo.py            great-circle geometry (haversine, bearing, destination)
   config.py         dataclass config + global seed helper
   data/             synthetic generator + clean/resample/window pipeline

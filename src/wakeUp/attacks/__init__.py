@@ -1,4 +1,4 @@
-from wakeguard.attacks.injectors import (
+from wakeUp.attacks.injectors import (
     AttackType,
     inject_position_jump,
     inject_kinematic_impossible,

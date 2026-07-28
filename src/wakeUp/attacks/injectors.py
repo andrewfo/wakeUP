@@ -26,8 +26,8 @@ from enum import Enum
 import numpy as np
 import pandas as pd
 
-from wakeguard import geo
-from wakeguard.config import AttackConfig
+from wakeUp import geo
+from wakeUp.config import AttackConfig
 
 
 class AttackType(str, Enum):

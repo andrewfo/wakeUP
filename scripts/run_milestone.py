@@ -21,13 +21,13 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from wakeguard.config import Config, load_config, set_global_seed, REPO_ROOT
-from wakeguard.data import generate_fleet, build_dataset
-from wakeguard.attacks import build_attacked_dataset, AttackType, inject_position_jump
-from wakeguard.features import build_feature_matrix
-from wakeguard.models import KinematicRuleDetector, IsolationForestDetector
-from wakeguard.eval import plot_pr_curves, plot_score_hist, plot_window_example
-from wakeguard.eval.metrics import per_attack_metrics, dominant_attack_type, evaluate_scores
+from wakeUp.config import Config, load_config, set_global_seed, REPO_ROOT
+from wakeUp.data import generate_fleet, build_dataset
+from wakeUp.attacks import build_attacked_dataset, AttackType, inject_position_jump
+from wakeUp.features import build_feature_matrix
+from wakeUp.models import KinematicRuleDetector, IsolationForestDetector
+from wakeUp.eval import plot_pr_curves, plot_score_hist, plot_window_example
+from wakeUp.eval.metrics import per_attack_metrics, dominant_attack_type, evaluate_scores
 
 
 def main() -> None:
@@ -108,7 +108,7 @@ def main() -> None:
     example_wid = int(feat_df.index[0])
     clean_win = windows[windows["window_id"] == example_wid].copy()
     rng = np.random.default_rng(0)
-    from wakeguard.config import AttackConfig
+    from wakeUp.config import AttackConfig
 
     atk_win = inject_position_jump(clean_win, rng, AttackConfig())
     plot_window_example(
