@@ -108,3 +108,15 @@ def test_plot_robustness_curves(windows, rule_only, attack_cfg, tmp_path):
     )
     out = plot_robustness_curves(df, tmp_path / "robustness.png")
     assert out.exists() and out.stat().st_size > 0
+
+
+def test_holdout_mode_splits_by_vessel(windows, rule_only, attack_cfg):
+    """holdout=True scores fewer windows — the held-out vessels only."""
+    kw = dict(values=[8.0], attack_cfg=attack_cfg, detectors=rule_only)
+    full = sweep_attack_severity(windows, AttackType.POSITION_JUMP, **kw)
+    held = sweep_attack_severity(
+        windows, AttackType.POSITION_JUMP, holdout=True, test_frac=0.4, **kw
+    )
+    assert held["n"].iloc[0] < full["n"].iloc[0]
+    assert held["n_pos"].iloc[0] > 0
+    assert held["pr_auc"].notna().all()

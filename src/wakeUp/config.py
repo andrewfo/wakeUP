@@ -71,6 +71,18 @@ class ModelConfig:
     lstm_lr: float = 1e-3
     lstm_batch_size: int = 64
     lstm_contamination: float = 0.1
+    # Transformer encoder (Phase 4, main model). Also small: 1760 windows of
+    # 32 points is not enough data to feed a wide encoder.
+    tf_d_model: int = 64
+    tf_nhead: int = 4
+    tf_layers: int = 2
+    tf_ff: int = 128
+    tf_dropout: float = 0.1
+    tf_epochs: int = 40
+    tf_lr: float = 1e-3
+    tf_batch_size: int = 64
+    tf_cls_weight: float = 1.0     # weight on the classification loss
+    tf_contamination: float = 0.1  # operating point when unsupervised
 
 
 @dataclass

@@ -24,11 +24,13 @@ The defensible single-attack slice from the plan:
 python scripts/run_milestone.py --single-attack position_jump
 ```
 
-Degradation curves over attack subtlety, and the sequence model:
+Degradation curves over attack subtlety, and the sequence models:
 
 ```bash
 python scripts/run_milestone.py --robustness
-pip install -e ".[learned]" && python scripts/run_milestone.py --lstm
+pip install -e ".[learned]"                       # torch, for the two below
+python scripts/run_milestone.py --lstm            # LSTM autoencoder
+python scripts/run_milestone.py --transformer     # Transformer, held-out vessels
 ```
 
 Outputs:
@@ -49,7 +51,7 @@ synthetic fleet ─► clean / resample / window ─► inject labeled attacks
                                     │
                      kinematic-consistency features
                                     │
-        detectors: KinematicRule · IsolationForest · LSTM-AE
+   detectors: KinematicRule · IsolationForest · LSTM-AE · Transformer
                                     │
               per-attack PR-AUC / ROC-AUC / FPR@recall + figures
                                     │
@@ -74,6 +76,13 @@ open AIS through `data.pipeline.load_marinecadastre_csv`.
 
 Physics rules saturate on gross violations but miss the subtle attacks; the
 IsolationForest baseline recovers them.
+
+**The Transformer reaches 1.00 PR-AUC on all five attacks** on held-out vessels
+(train on 28, score on 12 unseen) — including gradual drift, where the LSTM-AE
+was at chance. Its classification head is exactly the fix the autoencoder
+result predicted. IsolationForest also hits 1.00 at these settings, though, so
+see the robustness section below for the comparison that actually separates
+them.
 
 **The LSTM autoencoder loses to both** — reported as-is rather than tuned away.
 Its loss converges and the result is stable across `lstm_hidden` 8→64 and
@@ -100,9 +109,29 @@ the informative region is one to three orders of magnitude subtler:
 IsolationForest leads the physics rule by roughly a decade of severity on
 position jumps and across the whole drift ladder, but the two curves *cross* on
 `kinematic_impossible` near 1.5× — once a violation is gross, the rule that
-tests for it directly wins. Since the synthetic fleet is perfectly
-self-consistent, these knees are optimistic; real AIS noise should push them
-right. Sequence models (LSTM-AE, Transformer) and real-region ingest are next.
+tests for it directly wins.
+
+Adding the supervised Transformer (`--transformer --robustness`, all detectors
+on the same held-out split) moves the knee another order of magnitude subtler:
+
+| knob | value | KinematicRule | IsolationForest | Transformer |
+|---|---|---|---|---|
+| `jump_km` | 0.005 | 0.14 | 0.27 | **0.74** |
+| | 0.050 | 0.25 | 0.93 | **1.00** |
+| `speed_multiplier` | 1.01 | 0.15 | 0.25 | **0.98** |
+| `drift_total_km` | 0.05 | 0.13 | 0.27 | **0.81** |
+| | 0.10 | 0.14 | 0.58 | **0.99** |
+
+It only collapses to the others at a 1 m jump, below any meaningful spoof.
+**This is not an apples-to-apples comparison** — the Transformer is supervised
+and sees attack labels the other two never do, so the honest claim is
+"supervision buys about a decade of subtlety here", not "the Transformer is a
+better detector". Separating those is the next step (features vs learned vs
+hybrid, with an unsupervised Transformer control).
+
+Since the synthetic fleet is perfectly self-consistent, all these knees are
+optimistic; real AIS noise should push them right, which is what the
+real-region ingest is for.
 
 ## Layout
 
@@ -113,8 +142,8 @@ src/wakeUp/
   data/             synthetic generator + clean/resample/window pipeline
   attacks/          5 labeled attack injectors (the eval backbone)
   features/         kinematic-consistency feature extraction
-  models/           rule detector, IsolationForest, LSTM autoencoder
-  eval/             metrics, robustness sweeps, figure generation
+  models/           rule detector, IsolationForest, LSTM-AE, Transformer
+  eval/             metrics, robustness sweeps, splits, figure generation
 scripts/run_milestone.py   end-to-end runner
 configs/default.yaml       experiment config
 tests/                     pytest suite (attacks tested hardest)

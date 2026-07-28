@@ -104,12 +104,20 @@ spoofer also fakes a self-consistent SOG/COG.
       windows frame (tensorising internally with train-only stats) or a
       prebuilt `(N, L, C)` array; CPU + explicit-`rng` batching so runs are
       bitwise reproducible. Opt-in via `--lstm`; needs the `learned` extra.
-- [ ] **Main:** Transformer encoder over track windows, reconstruction and
-      classification heads. ⬜
+- [x] **Main:** Transformer encoder over track windows with **both** a
+      reconstruction head and a classification head (`models/transformer.py`).
+      Fixed sinusoidal positional encoding, `norm_first` pre-LN blocks,
+      class-rebalanced BCE. `fit(X)` trains reconstruction only and stays
+      unsupervised (so the robustness harness drives it unchanged);
+      `fit(X, supervised=True)` adds the classification loss and **must** be
+      scored on held-out vessels.
 - [ ] **Stretch:** temporal GNN over co-located vessels for spatial context. ⬜
 
 All detectors expose `fit` / `score` where larger score == more anomalous, so
-the eval harness treats them uniformly.
+the eval harness treats them uniformly. Two opt-in class attributes let the
+harnesses adapt without special-casing: `consumes_windows` (wants the
+per-point frame, not the aggregated feature matrix) and `supports_supervision`
+(can train with labels when the harness runs a held-out protocol).
 
 ## Phase 5 — Eval 🔨
 
@@ -122,6 +130,12 @@ the eval harness treats them uniformly.
       `plot_robustness_curves`, run via `--robustness` / `make robustness`).
       Same windows corrupted at every severity, so the curve isolates
       subtlety rather than sampling noise.
+- [x] Held-out protocol for the supervised arm (`eval/splits.py`). Splits **by
+      vessel**, not by window: `window_stride < window_len`, so consecutive
+      windows share points and a window-level split would leak. `--transformer`
+      runs every detector under one held-out protocol so the supervised column
+      stays comparable; `sweep_attack_severity(holdout=True)` does the same
+      inside the sweeps.
 - [ ] Detection latency (points-from-onset to first alarm). ⬜
 - [ ] Ablations: features-only vs learned vs hybrid. ⬜
 
@@ -172,6 +186,44 @@ cannot. That argues the Transformer should carry a *classification* head
 alongside reconstruction, and it is the concrete motivation for the
 features-vs-learned-vs-hybrid ablation.
 
+**Transformer result (synthetic, seed 1234, `--transformer --robustness`).**
+Trained on 28 vessels (1232 windows), scored on 12 unseen vessels (528
+windows, 72 positives). At the default severities it reaches **1.00 PR-AUC on
+all five attacks** — including `gradual_drift`, where the LSTM-AE was at
+chance (0.04). The classification head is exactly the fix the AE result
+predicted: reconstruction alone cannot see a smooth global offset, a
+discriminative head can.
+
+But IsolationForest *also* scores 1.00 on every attack at those settings, so
+the headline table cannot separate them. The severity sweep can (held-out
+PR-AUC, all detectors on the same split):
+
+| knob | value | KinematicRule | IsolationForest | Transformer |
+|---|---|---|---|---|
+| `jump_km` | 0.001 | 0.13 | 0.17 | 0.13 |
+| | 0.005 | 0.14 | 0.27 | **0.74** |
+| | 0.010 | 0.15 | 0.56 | **0.95** |
+| | 0.050 | 0.25 | 0.93 | **1.00** |
+| `speed_multiplier` | 1.01 | 0.15 | 0.25 | **0.98** |
+| | 1.10 | 0.26 | 0.67 | **1.00** |
+| `drift_total_km` | 0.02 | 0.12 | 0.19 | **0.30** |
+| | 0.05 | 0.13 | 0.27 | **0.81** |
+| | 0.10 | 0.14 | 0.58 | **0.99** |
+
+The Transformer moves the detection knee roughly **one order of magnitude
+subtler** on every family, and on `kinematic_impossible` it is essentially
+saturated (0.98) at a 1.01× speed inflation that the physics rule cannot see at
+all. It only collapses to the others at `jump_km` 0.001 — a 1 m displacement,
+below any physically meaningful spoof.
+
+**The comparison is not apples-to-apples, and should not be reported as one.**
+The Transformer is *supervised*: it sees attack labels during training, which
+the rule and IsolationForest never do. The honest claim is "supervision buys
+about a decade of attack subtlety on this benchmark", not "the Transformer is
+a better anomaly detector". The features-vs-learned-vs-hybrid ablation is what
+would decompose that gain, and an unsupervised Transformer arm
+(`fit()` without `supervised=True`) is the matched control.
+
 **Robustness result (synthetic, seed 1234, `--robustness`).** PR-AUC vs attack
 severity, base rate 0.15. The headline settings sit far into the saturated
 regime; the informative region is one to three orders of magnitude subtler:
@@ -197,14 +249,14 @@ real-data ingest.
 
 ## Next actions
 
-1. **Main model:** Transformer encoder over the sequence tensors with *both*
-   reconstruction and classification heads (Phase 4). The LSTM-AE result above
-   is the argument for the classification head: a pure reconstruction
-   objective is structurally blind to gradual drift.
+1. **Ablation: features-only vs learned vs hybrid** (Phase 5), including an
+   *unsupervised* Transformer arm. This is now the highest-value step: the
+   supervised Transformer's decade-of-subtlety gain is currently confounded
+   with its access to labels, and only the ablation separates "sequence model"
+   from "supervision".
 2. Detection latency: points-from-onset to first alarm (Phase 5). Pure
    numpy over the existing per-point `is_attack` labels, so unblocked.
-3. Ablation: features-only vs learned vs hybrid (Phase 5) — the LSTM-AE and
-   IsolationForest per-attack profiles are near-complementary, so the hybrid
-   arm is worth measuring rather than assuming.
-4. Real MarineCadastre region ingest and re-run, including the robustness
+3. Real MarineCadastre region ingest and re-run, including the robustness
    sweeps, to see how far sensor noise moves the knees (Phase 1).
+4. **Stretch:** temporal GNN over co-located vessels (Phase 4). Needs the
+   `gnn` extra and probably the PostGIS neighbour queries from Phase 1.

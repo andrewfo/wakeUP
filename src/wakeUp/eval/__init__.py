@@ -9,6 +9,10 @@ from wakeUp.eval.plots import (
     plot_score_hist,
     plot_window_example,
 )
+from wakeUp.eval.splits import (
+    train_test_split_by_vessel,
+    window_labels,
+)
 from wakeUp.eval.robustness import (
     DEFAULT_SWEEPS,
     SWEEP_PARAM,
@@ -28,4 +32,6 @@ __all__ = [
     "SWEEP_PARAM",
     "run_robustness_sweeps",
     "sweep_attack_severity",
+    "train_test_split_by_vessel",
+    "window_labels",
 ]

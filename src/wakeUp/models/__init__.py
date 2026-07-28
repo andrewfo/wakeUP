@@ -7,6 +7,7 @@ __all__ = [
     "KinematicRuleDetector",
     "IsolationForestDetector",
     "LSTMAutoencoderDetector",
+    "TransformerDetector",
 ]
 
 
@@ -21,4 +22,8 @@ def __getattr__(name):
         from wakeUp.models.sequence_ae import LSTMAutoencoderDetector
 
         return LSTMAutoencoderDetector
+    if name == "TransformerDetector":
+        from wakeUp.models.transformer import TransformerDetector
+
+        return TransformerDetector
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

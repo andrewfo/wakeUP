@@ -51,6 +51,12 @@ def main() -> None:
         help="also fit the LSTM autoencoder (requires the [learned] extra)",
     )
     ap.add_argument(
+        "--transformer",
+        action="store_true",
+        help="also fit the Transformer, supervised on held-out vessels "
+        "(requires the [learned] extra)",
+    )
+    ap.add_argument(
         "--robustness",
         action="store_true",
         help="also run the attack-subtlety sweeps (slower: rebuilds the dataset per severity)",
@@ -140,12 +146,57 @@ def main() -> None:
         title="Position-jump attack (clean vs spoofed)",
     )
 
+    if args.transformer:
+        # The Transformer's classification head is supervised, so it cannot
+        # join the table above (which scores the windows it would train on).
+        # Run every detector under one held-out-vessel protocol instead.
+        from wakeUp.eval.splits import train_test_split_by_vessel, window_labels
+        from wakeUp.models import TransformerDetector
+
+        print("\n[+] held-out evaluation (train on unseen vessels) ...")
+        train_w, test_w = train_test_split_by_vessel(attacked, test_frac=0.3, seed=0)
+        train_feat, _ = build_feature_matrix(train_w)
+        test_feat, test_labels = build_feature_matrix(test_w)
+        test_dom = dominant_attack_type(test_w).reindex(test_feat.index).to_numpy()
+        print(
+            f"      train windows={train_w['window_id'].nunique():,} "
+            f"({train_w['mmsi'].nunique()} vessels)  "
+            f"test windows={len(test_labels):,} ({test_w['mmsi'].nunique()} vessels)"
+        )
+
+        holdout_scores = {
+            "KinematicRule": KinematicRuleDetector().fit(train_feat).score(test_feat),
+            "IsolationForest": IsolationForestDetector(cfg.model)
+            .fit(train_feat)
+            .score(test_feat),
+            "Transformer": TransformerDetector(cfg.model)
+            .fit(train_w, supervised=True)
+            .score(test_w),
+        }
+        results["_holdout"] = {}
+        for name, sc in holdout_scores.items():
+            per_atk = per_attack_metrics(sc, test_labels, test_dom)
+            results["_holdout"][name] = {
+                "overall": evaluate_scores(test_labels, sc),
+                "per_attack": per_atk.to_dict(orient="records"),
+            }
+            print(f"\n=== {name} (held-out vessels) ===")
+            print(per_atk.to_string(index=False, float_format=lambda v: f"{v:.3f}"))
+        (proc_dir / "results.json").write_text(json.dumps(results, indent=2))
+
     if args.robustness:
         print("\n[+] robustness sweeps over attack subtlety ...")
+        # With --transformer the whole sweep switches to the held-out protocol
+        # so the supervised column is comparable with the unsupervised ones.
         sweep = run_robustness_sweeps(
             windows,
             attack_cfg=cfg.attack,
-            detectors=default_detectors(cfg.model, include_lstm=args.lstm),
+            detectors=default_detectors(
+                cfg.model,
+                include_lstm=args.lstm,
+                include_transformer=args.transformer,
+            ),
+            holdout=args.transformer,
         )
         sweep.to_csv(proc_dir / "robustness.csv", index=False)
         plot_robustness_curves(sweep, fig_dir / "robustness_curves.png")

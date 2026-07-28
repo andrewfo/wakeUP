@@ -4,7 +4,7 @@
 
 PYTHON ?= python
 
-.PHONY: help install data features train eval figures milestone milestone-jump robustness lstm test lint clean
+.PHONY: help install data features train eval figures milestone milestone-jump robustness lstm transformer test lint clean
 
 help:
 	@echo "Targets:"
@@ -12,6 +12,7 @@ help:
 	@echo "  milestone run end-to-end first-milestone slice (data+attacks+baseline+figures)"
 	@echo "  robustness run the attack-subtlety sweeps + degradation curves"
 	@echo "  lstm      run the milestone with the LSTM autoencoder ([learned] extra)"
+	@echo "  transformer  run the Transformer, held-out protocol ([learned] extra)"
 	@echo "  test      run the test suite"
 	@echo "  figures   regenerate figures from the last run"
 	@echo "  clean     remove generated data/figures/caches"
@@ -47,6 +48,11 @@ robustness:
 # Adds the LSTM autoencoder (Phase 4). Needs: pip install -e ".[learned]"
 lstm:
 	$(PYTHON) scripts/run_milestone.py --config configs/default.yaml --lstm
+
+# Transformer, supervised on held-out vessels (Phase 4). Needs [learned].
+# Combine with --robustness for the held-out degradation curves.
+transformer:
+	$(PYTHON) scripts/run_milestone.py --config configs/default.yaml --transformer
 
 test:
 	$(PYTHON) -m pytest

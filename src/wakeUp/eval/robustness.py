@@ -37,6 +37,7 @@ import pandas as pd
 from wakeUp.attacks import AttackType, build_attacked_dataset
 from wakeUp.config import AttackConfig, ModelConfig
 from wakeUp.eval.metrics import evaluate_scores
+from wakeUp.eval.splits import train_test_split_by_vessel
 from wakeUp.features import build_feature_matrix
 from wakeUp.models import IsolationForestDetector, KinematicRuleDetector
 
@@ -65,12 +66,15 @@ DetectorFactories = Mapping[str, Callable[[], object]]
 
 
 def default_detectors(
-    model_cfg: ModelConfig | None = None, include_lstm: bool = False
+    model_cfg: ModelConfig | None = None,
+    include_lstm: bool = False,
+    include_transformer: bool = False,
 ) -> dict[str, Callable[[], object]]:
     """The milestone's baselines, as factories.
 
-    ``include_lstm`` adds the LSTM autoencoder; it retrains at every sweep
-    point, so it is opt-in and needs the ``learned`` extra.
+    The learned detectors retrain at every sweep point, so they are opt-in and
+    need the ``learned`` extra. The Transformer only uses its classification
+    head when the sweep runs with ``holdout=True``.
     """
     cfg = model_cfg or ModelConfig()
     factories: dict[str, Callable[[], object]] = {
@@ -81,6 +85,10 @@ def default_detectors(
         from wakeUp.models import LSTMAutoencoderDetector
 
         factories["LSTM-AE"] = lambda: LSTMAutoencoderDetector(cfg)
+    if include_transformer:
+        from wakeUp.models import TransformerDetector
+
+        factories["Transformer"] = lambda: TransformerDetector(cfg)
     return factories
 
 
@@ -91,6 +99,9 @@ def sweep_attack_severity(
     attack_cfg: AttackConfig | None = None,
     detectors: DetectorFactories | None = None,
     recall_target: float = 0.90,
+    holdout: bool = False,
+    test_frac: float = 0.3,
+    split_seed: int = 0,
 ) -> pd.DataFrame:
     """Degradation curve for one attack family over its subtlety knob.
 
@@ -98,6 +109,13 @@ def sweep_attack_severity(
     metrics from :func:`~wakeUp.eval.metrics.evaluate_scores` — the binary task
     at each point is {this attack} vs clean windows, since only this attack
     type is injected.
+
+    ``holdout=True`` switches every detector to a train-on-unseen-vessels /
+    score-on-held-out protocol, and lets detectors declaring
+    ``supports_supervision`` train with labels. All detectors move together so
+    the column comparison stays like-for-like — a supervised model scored on
+    held-out data next to unsupervised models scored on everything would not
+    be a comparison.
     """
     atype = AttackType(attack_type)
     if atype not in SWEEP_PARAM:
@@ -114,14 +132,27 @@ def sweep_attack_severity(
     for v in ladder:
         cfg_v = replace(base, **{param: float(v)})
         attacked = build_attacked_dataset(windows, cfg_v, attack_types=[atype])
-        feat_df, labels = build_feature_matrix(attacked)
+        if holdout:
+            fit_frame, score_frame = train_test_split_by_vessel(
+                attacked, test_frac=test_frac, seed=split_seed
+            )
+        else:
+            fit_frame = score_frame = attacked
+        fit_feat, _ = build_feature_matrix(fit_frame)
+        score_feat, labels = build_feature_matrix(score_frame)
+
         for name, make in factories.items():
             det = make()
             # Sequence models want the per-point frame; both groupings sort by
             # window_id, so scores stay aligned with `labels` either way.
-            payload = attacked if getattr(det, "consumes_windows", False) else feat_df
-            det.fit(payload)
-            metrics = evaluate_scores(labels, det.score(payload), recall_target)
+            seq = getattr(det, "consumes_windows", False)
+            fit_payload = fit_frame if seq else fit_feat
+            score_payload = score_frame if seq else score_feat
+            if holdout and getattr(det, "supports_supervision", False):
+                det.fit(fit_payload, supervised=True)
+            else:
+                det.fit(fit_payload)
+            metrics = evaluate_scores(labels, det.score(score_payload), recall_target)
             rows.append(
                 {
                     "attack_type": atype.value,
@@ -140,6 +171,9 @@ def run_robustness_sweeps(
     detectors: DetectorFactories | None = None,
     sweeps: Mapping[AttackType, Iterable[float]] | None = None,
     recall_target: float = 0.90,
+    holdout: bool = False,
+    test_frac: float = 0.3,
+    split_seed: int = 0,
 ) -> pd.DataFrame:
     """Run every sweepable attack family and concatenate the curves."""
     if sweeps is None:
@@ -152,6 +186,9 @@ def run_robustness_sweeps(
             attack_cfg=attack_cfg,
             detectors=detectors,
             recall_target=recall_target,
+            holdout=holdout,
+            test_frac=test_frac,
+            split_seed=split_seed,
         )
         for atype, values in sweeps.items()
     ]
