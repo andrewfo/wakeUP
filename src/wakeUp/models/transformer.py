@@ -45,7 +45,11 @@ except ImportError as exc:  # pragma: no cover - exercised only without torch
         '    pip install -e ".[learned]"'
     ) from exc
 
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler
+
 from wakeUp.config import ModelConfig
+from wakeUp.features import build_feature_matrix
 from wakeUp.features.sequences import SequenceTensorizer
 
 
@@ -87,9 +91,12 @@ class _TrackTransformer(nn.Module):
         self.cls_head = nn.Linear(d, 1)
         self.register_buffer("pe", _sinusoidal_encoding(512, d), persistent=False)
 
-    def forward(self, x: "torch.Tensor") -> tuple["torch.Tensor", "torch.Tensor"]:
+    def encode(self, x: "torch.Tensor") -> "torch.Tensor":
         h = self.input_proj(x) + self.pe[:, : x.shape[1]]
-        h = self.encoder(h)
+        return self.encoder(h)                  # (B, L, d_model)
+
+    def forward(self, x: "torch.Tensor") -> tuple["torch.Tensor", "torch.Tensor"]:
+        h = self.encode(x)
         recon = self.recon_head(h)              # (B, L, C)
         logit = self.cls_head(h.mean(dim=1)).squeeze(-1)  # (B,)
         return recon, logit
@@ -235,6 +242,22 @@ class TransformerDetector:
             raise RuntimeError("TransformerDetector must be fit before score")
         return self._forward_scores(self._to_tensor(data, fit_stats=False))
 
+    def embed(self, data) -> np.ndarray:
+        """Mean-pooled encoder embedding per window, ``(N, d_model)``.
+
+        This is exactly the vector the classification head sees, so a linear
+        model on it is comparable with ``cls_head`` — the hook the hybrid
+        ablation cell builds on.
+        """
+        if self.model_ is None:
+            raise RuntimeError("TransformerDetector must be fit before embed")
+        X = self._to_tensor(data, fit_stats=False)
+        self.model_.eval()
+        xt = torch.as_tensor(X, dtype=torch.float32, device=self.device)
+        with torch.no_grad():
+            pooled = self.model_.encode(xt).mean(dim=1)
+        return pooled.cpu().numpy().astype(float)
+
     def predict(self, data) -> np.ndarray:
         if self.threshold_ is None:
             raise RuntimeError("TransformerDetector must be fit before predict")
@@ -269,3 +292,76 @@ class ReconTransformerDetector(TransformerDetector):
             )
         super().fit(data, supervised=False)
         return self
+
+
+class HybridDetector(TransformerDetector):
+    """Supervised linear head over **hand features ⊕ pooled encoder embedding**.
+
+    The ablation's fifth cell, answering the question the 2×2 left open: the
+    supervised Transformer's edge over supervised hand features is small and
+    confined to the extreme-subtle discontinuity attacks — is that edge
+    *complementary* to the features (a hybrid recovers both) or a substitute
+    (the hybrid matches the better single representation and no more)?
+
+    Protocol: the encoder is trained exactly as the supervised Transformer cell
+    (reconstruction + classification loss, same seed and schedule), then frozen;
+    a logistic regression — the same linear-head family the two supervised
+    cells share — is fit on the concatenation of the 27 standardised window
+    features and the standardised mean-pooled encoding. Any gain over the
+    Logistic cell is therefore attributable to the appended embedding, and any
+    gain over the Transformer cell to the appended hand features, with the
+    classifier held linear throughout.
+    """
+
+    #: Hand this detector the per-point windows frame, not the feature matrix.
+    consumes_windows = True
+    #: Supervised only: the hybrid head has no meaning without labels.
+    supports_supervision = True
+
+    def __init__(self, cfg: ModelConfig | None = None, device: str = "cpu"):
+        super().__init__(cfg, device)
+        self.head_: LogisticRegression | None = None
+        self.feat_scaler_: StandardScaler | None = None
+        self.emb_scaler_: StandardScaler | None = None
+        self.columns_: list[str] | None = None
+
+    def _joint(self, windows: pd.DataFrame, fit_scalers: bool) -> np.ndarray:
+        """``[features ‖ embedding]`` in the shared sorted-``window_id`` order.
+
+        ``build_feature_matrix`` and the sequence tensorizer both group by
+        ``window_id`` with ``sort=True``, so the two blocks align row-for-row.
+        """
+        feat_df, _ = build_feature_matrix(windows)
+        emb = self.embed(windows)
+        if fit_scalers:
+            self.columns_ = list(feat_df.columns)
+            self.feat_scaler_ = StandardScaler().fit(feat_df.to_numpy())
+            self.emb_scaler_ = StandardScaler().fit(emb)
+        F = self.feat_scaler_.transform(feat_df[self.columns_].to_numpy())
+        E = self.emb_scaler_.transform(emb)
+        return np.hstack([F, E])
+
+    def fit(self, data, y=None, supervised: bool = True) -> "HybridDetector":
+        if not supervised:
+            raise ValueError(
+                "HybridDetector is the supervised hybrid cell; it needs labels"
+            )
+        if not isinstance(data, pd.DataFrame):
+            raise TypeError(
+                "HybridDetector needs the per-point windows frame to build "
+                "hand features alongside the embedding"
+            )
+        super().fit(data, y=y, supervised=True)
+        labels = self._labels_from(data, y)
+        joint = self._joint(data, fit_scalers=True)
+        self.head_ = LogisticRegression(
+            max_iter=1000, class_weight="balanced", random_state=self.cfg.seed
+        )
+        self.head_.fit(joint, labels.astype(int))
+        return self
+
+    def score(self, data) -> np.ndarray:
+        """Hybrid-head attack probability per window (larger == more anomalous)."""
+        if self.head_ is None:
+            raise RuntimeError("HybridDetector must be fit before score")
+        return self.head_.predict_proba(self._joint(data, fit_scalers=False))[:, 1]

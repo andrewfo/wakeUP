@@ -24,6 +24,12 @@ from wakeUp.eval.ablation import (
     run_ablation_sweeps,
     run_ablation_table,
 )
+from wakeUp.eval.latency import (
+    clean_fpr_threshold,
+    detection_latency,
+    run_detection_latency,
+    summarize_latency,
+)
 
 __all__ = [
     "evaluate_scores",
@@ -42,4 +48,8 @@ __all__ = [
     "ablation_cells",
     "run_ablation_sweeps",
     "run_ablation_table",
+    "clean_fpr_threshold",
+    "detection_latency",
+    "run_detection_latency",
+    "summarize_latency",
 ]

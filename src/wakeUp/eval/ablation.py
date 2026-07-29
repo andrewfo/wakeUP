@@ -51,9 +51,17 @@ AblationCell = tuple[str, str, Callable[[], object]]
 
 
 def ablation_cells(
-    model_cfg: ModelConfig | None = None, include_lstm: bool = False
+    model_cfg: ModelConfig | None = None,
+    include_lstm: bool = False,
+    include_hybrid: bool = False,
 ) -> dict[str, AblationCell]:
-    """The 2×2 ablation grid (plus the LSTM-AE as an optional learned/unsup cell).
+    """The 2×2 ablation grid, with two optional extra cells.
+
+    ``include_lstm`` adds the LSTM-AE as a second learned/unsupervised cell.
+    ``include_hybrid`` adds the fifth cell the 2×2 result calls for: a linear
+    head over hand features ⊕ pooled encoder embedding, testing whether the
+    Transformer's narrow extreme-subtle edge is *complementary* to the
+    features rather than a substitute for them.
 
     The learned cells need the ``learned`` extra, so they are imported lazily and
     the grid still constructs without torch for the two hand-feature cells.
@@ -83,6 +91,14 @@ def ablation_cells(
             "learned",
             "unsupervised",
             lambda: LSTMAutoencoderDetector(cfg),
+        )
+    if include_hybrid:
+        from wakeUp.models import HybridDetector
+
+        cells["Hybrid"] = (
+            "features+learned",
+            "supervised",
+            lambda: HybridDetector(cfg),
         )
     return cells
 

@@ -4,7 +4,7 @@
 
 PYTHON ?= python
 
-.PHONY: help install data features train eval figures milestone milestone-jump robustness lstm transformer ablation test lint clean
+.PHONY: help install data features train eval figures milestone milestone-jump robustness lstm transformer ablation latency test lint clean
 
 help:
 	@echo "Targets:"
@@ -13,7 +13,8 @@ help:
 	@echo "  robustness run the attack-subtlety sweeps + degradation curves"
 	@echo "  lstm      run the milestone with the LSTM autoencoder ([learned] extra)"
 	@echo "  transformer  run the Transformer, held-out protocol ([learned] extra)"
-	@echo "  ablation  features-vs-learned-vs-supervision 2x2, held-out ([learned] extra)"
+	@echo "  ablation  features-vs-learned-vs-supervision 2x2 + hybrid, held-out ([learned] extra)"
+	@echo "  latency   streaming detection latency (points from onset to first alarm)"
 	@echo "  test      run the test suite"
 	@echo "  figures   regenerate figures from the last run"
 	@echo "  clean     remove generated data/figures/caches"
@@ -59,7 +60,12 @@ transformer:
 # representation x supervision, held-out by vessel. Add --sweeps for the
 # subtlety decomposition. Needs [learned].
 ablation:
-	$(PYTHON) scripts/run_ablation.py --config configs/default.yaml --sweeps
+	$(PYTHON) scripts/run_ablation.py --config configs/default.yaml --sweeps --hybrid
+
+# Streaming-prefix detection latency (Phase 5): points from attack onset to
+# first alarm at a fixed clean-window FPR, held-out by vessel.
+latency:
+	$(PYTHON) scripts/run_latency.py --config configs/default.yaml
 
 test:
 	$(PYTHON) -m pytest

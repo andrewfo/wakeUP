@@ -23,6 +23,7 @@ from wakeUp.eval.ablation import (  # noqa: E402
 )
 from wakeUp.eval.splits import window_labels  # noqa: E402
 from wakeUp.models import (  # noqa: E402
+    HybridDetector,
     LogisticFeatureDetector,
     ReconTransformerDetector,
     TransformerDetector,
@@ -101,6 +102,51 @@ def test_recon_matches_transformer_recon_head(attacked):
 
 
 # --------------------------------------------------------------------------- #
+# HybridDetector — supervised linear head on features ⊕ pooled embedding
+# --------------------------------------------------------------------------- #
+def test_hybrid_contract_flags():
+    assert HybridDetector.consumes_windows is True
+    assert HybridDetector.supports_supervision is True
+
+
+def test_hybrid_scores_are_probabilities(attacked):
+    det = HybridDetector(FAST).fit(attacked, supervised=True)
+    scores = det.score(attacked)
+    assert scores.shape == window_labels(attacked).shape
+    assert np.isfinite(scores).all()
+    assert scores.min() >= 0.0 and scores.max() <= 1.0
+
+
+def test_hybrid_learns_training_data(attacked):
+    from sklearn.metrics import roc_auc_score
+
+    det = HybridDetector(FAST).fit(attacked, supervised=True)
+    # As with Logistic: fitting its own training windows rules out a
+    # mis-aligned feature/embedding/label ordering.
+    assert roc_auc_score(window_labels(attacked), det.score(attacked)) > 0.9
+
+
+def test_hybrid_refuses_unsupervised(attacked):
+    with pytest.raises(ValueError):
+        HybridDetector(FAST).fit(attacked, supervised=False)
+
+
+def test_hybrid_determinism(attacked):
+    a = HybridDetector(FAST).fit(attacked, supervised=True).score(attacked)
+    b = HybridDetector(FAST).fit(attacked, supervised=True).score(attacked)
+    assert np.allclose(a, b)
+
+
+def test_hybrid_embedding_dimensions(attacked):
+    det = HybridDetector(FAST).fit(attacked, supervised=True)
+    emb = det.embed(attacked)
+    n_windows = attacked["window_id"].nunique()
+    assert emb.shape == (n_windows, FAST.tf_d_model)
+    # The head sees 27 hand features + the pooled embedding, nothing else.
+    assert det.head_.coef_.shape[1] == len(det.columns_) + FAST.tf_d_model
+
+
+# --------------------------------------------------------------------------- #
 # The grid
 # --------------------------------------------------------------------------- #
 def test_ablation_cells_axes():
@@ -118,6 +164,14 @@ def test_ablation_cells_lstm_optin():
     assert "LSTM-AE" in cells
     rep, sup, _ = cells["LSTM-AE"]
     assert (rep, sup) == ("learned", "unsupervised")
+
+
+def test_ablation_cells_hybrid_optin():
+    cells = ablation_cells(FAST, include_hybrid=True)
+    assert "Hybrid" in cells
+    rep, sup, make = cells["Hybrid"]
+    assert (rep, sup) == ("features+learned", "supervised")
+    assert isinstance(make(), HybridDetector)
 
 
 def test_ablation_table_structure(windows):

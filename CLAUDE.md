@@ -12,7 +12,8 @@ scripts need `PYTHONPATH=src`:
 PYTHONPATH=src python -m pytest -q
 PYTHONPATH=src python scripts/run_milestone.py [--single-attack position_jump]
                                                [--lstm] [--transformer] [--robustness]
-PYTHONPATH=src python scripts/run_ablation.py  [--sweeps] [--lstm]
+PYTHONPATH=src python scripts/run_ablation.py  [--sweeps] [--lstm] [--hybrid]
+PYTHONPATH=src python scripts/run_latency.py   [--transformer] [--max-fpr 0.05]
 ```
 
 `make test` / `make milestone` / `make robustness` / `make lstm` /
@@ -110,6 +111,22 @@ harness fits it reconstruction-only even while it hands the supervised cells
 their labels. `LogisticFeatureDetector` sets `consumes_windows = True` and builds
 features internally, so it slots into the same harness branch as the sequence
 models with no special-casing.
+
+`--hybrid` adds a fifth cell, `HybridDetector` ("features+learned" ×
+"supervised"): a logistic head over the 27 hand features ⊕ the Transformer's
+mean-pooled encoder embedding (the exact vector `cls_head` sees), with the
+encoder trained identically to the supervised Transformer cell. Gain over
+Logistic ⇒ the embedding adds something; gain over Transformer ⇒ the features
+do; the classifier stays linear throughout. It is supervised-only (`fit`
+raises without labels) and needs the windows frame, not the feature matrix.
+
+**Detection latency** (`eval/latency.py`, `scripts/run_latency.py`) replays
+held-out windows as streaming prefixes. The alarm threshold is recalibrated
+per prefix length to a fixed clean-window FPR (`clean_fpr_threshold`, quantile
+`method="higher"` so ties can't blow the budget); alarms before the prefix
+contains any attacked point are false positives, not detections; misses stay
+in the table. Detectors fit once on full-length train windows and only score
+prefixes.
 
 ## Reporting results
 

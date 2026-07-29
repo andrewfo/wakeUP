@@ -11,6 +11,7 @@ __all__ = [
     "LSTMAutoencoderDetector",
     "TransformerDetector",
     "ReconTransformerDetector",
+    "HybridDetector",
 ]
 
 
@@ -33,4 +34,8 @@ def __getattr__(name):
         from wakeUp.models.transformer import ReconTransformerDetector
 
         return ReconTransformerDetector
+    if name == "HybridDetector":
+        from wakeUp.models.transformer import HybridDetector
+
+        return HybridDetector
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

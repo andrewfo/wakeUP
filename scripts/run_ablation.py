@@ -53,6 +53,11 @@ def main() -> None:
         action="store_true",
         help="add the LSTM-AE as a second learned/unsupervised cell",
     )
+    ap.add_argument(
+        "--hybrid",
+        action="store_true",
+        help="add the hybrid cell (linear head on hand features + pooled embedding)",
+    )
     ap.add_argument("--outdir", default=None)
     args = ap.parse_args()
 
@@ -73,7 +78,9 @@ def main() -> None:
         f"vessels={windows['mmsi'].nunique()}"
     )
 
-    grid = ablation_cells(cfg.model, include_lstm=args.lstm)
+    grid = ablation_cells(
+        cfg.model, include_lstm=args.lstm, include_hybrid=args.hybrid
+    )
 
     print("[2/3] held-out ablation table (all five attacks) ...")
     table = run_ablation_table(
