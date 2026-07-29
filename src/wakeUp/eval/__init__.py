@@ -30,6 +30,11 @@ from wakeUp.eval.latency import (
     run_detection_latency,
     summarize_latency,
 )
+from wakeUp.eval.dashboard import (
+    build_payload,
+    render_dashboard,
+    write_dashboard,
+)
 
 __all__ = [
     "evaluate_scores",
@@ -52,4 +57,7 @@ __all__ = [
     "detection_latency",
     "run_detection_latency",
     "summarize_latency",
+    "build_payload",
+    "render_dashboard",
+    "write_dashboard",
 ]

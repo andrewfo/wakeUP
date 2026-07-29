@@ -4,7 +4,7 @@
 
 PYTHON ?= python
 
-.PHONY: help install data features train eval figures milestone milestone-jump robustness lstm transformer ablation latency test lint clean
+.PHONY: help install data features train eval figures milestone milestone-jump robustness lstm transformer ablation latency dashboard test lint clean
 
 help:
 	@echo "Targets:"
@@ -15,6 +15,7 @@ help:
 	@echo "  transformer  run the Transformer, held-out protocol ([learned] extra)"
 	@echo "  ablation  features-vs-learned-vs-supervision 2x2 + hybrid, held-out ([learned] extra)"
 	@echo "  latency   streaming detection latency (points from onset to first alarm)"
+	@echo "  dashboard render the self-contained HTML dashboard (figures/dashboard.html)"
 	@echo "  test      run the test suite"
 	@echo "  figures   regenerate figures from the last run"
 	@echo "  clean     remove generated data/figures/caches"
@@ -66,6 +67,12 @@ ablation:
 # first alarm at a fixed clean-window FPR, held-out by vessel.
 latency:
 	$(PYTHON) scripts/run_latency.py --config configs/default.yaml
+
+# Self-contained offline HTML dashboard (Phase 6): tracks + attacks map,
+# held-out detector scores, sweep curves and latency (reads the CSVs the
+# ablation/robustness/latency targets produce, when present).
+dashboard:
+	$(PYTHON) scripts/run_dashboard.py --config configs/default.yaml
 
 test:
 	$(PYTHON) -m pytest

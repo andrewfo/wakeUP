@@ -122,7 +122,7 @@ harnesses adapt without special-casing: `consumes_windows` (wants the
 per-point frame, not the aggregated feature matrix) and `supports_supervision`
 (can train with labels when the harness runs a held-out protocol).
 
-## Phase 5 — Eval 🔨
+## Phase 5 — Eval ✅ (on synthetic; re-run on real data pending Phase 1)
 
 - [x] Per-attack-type PR-AUC / ROC-AUC and FPR at fixed recall (each attack
       scored against clean windows only).
@@ -139,13 +139,26 @@ per-point frame, not the aggregated feature matrix) and `supports_supervision`
       runs every detector under one held-out protocol so the supervised column
       stays comparable; `sweep_attack_severity(holdout=True)` does the same
       inside the sweeps.
-- [ ] Detection latency (points-from-onset to first alarm). ⬜
+- [x] Detection latency (`eval/latency.py`, `scripts/run_latency.py`,
+      `make latency`): held-out windows replayed as streams; per prefix length
+      the alarm threshold is recalibrated to a fixed clean-window FPR (score
+      distributions shift as windows grow, so a single full-window threshold
+      would let short prefixes alarm for free), and latency is
+      points-from-onset to the first alarming prefix. Alarms on prefixes with
+      no attacked points yet are false positives, not detections; misses stay
+      in the table so detection rate and latency read together. Detectors fit
+      once on full-length train windows, scored on prefixes — the
+      offline-train / streaming-score deployment shape.
 - [x] Ablation: features-only vs learned × unsupervised vs supervised, as a 2×2
       under one held-out split (`eval/ablation.py`, `scripts/run_ablation.py`).
       Decomposes the Transformer's gain into a learned-representation axis and a
       supervision axis; the two supervised cells share a linear head so the
-      comparison holds the classifier fixed. Hybrid (features ⊕ learned
-      embedding) still open. ⬜(hybrid)
+      comparison holds the classifier fixed. `--hybrid` adds the fifth cell:
+      `HybridDetector`, a logistic head over the 27 hand features ⊕ the
+      Transformer's mean-pooled encoder embedding (the exact vector `cls_head`
+      sees), encoder trained identically to the supervised Transformer cell —
+      so any gain over Logistic is the appended embedding, any gain over the
+      Transformer is the appended features, classifier linear throughout.
 
 ## Phase 6 — Deliverable 🔨
 
@@ -153,6 +166,14 @@ per-point frame, not the aggregated feature matrix) and `supports_supervision`
       `attack_example_jump.png`, and `robustness_curves.png` (log-x degradation
       panel per swept knob, written by `--robustness`).
 - [x] README with reproduce-in-one-command.
+- [x] Visual dashboard (`eval/dashboard.py`, `scripts/run_dashboard.py`,
+      `make dashboard`): one self-contained HTML file (inline SVG + vanilla
+      JS, no network, opens from `file://`) with four panels — vessel tracks
+      with spoof segments overlaid (click-to-focus), held-out score strips +
+      per-attack PR-AUC table, severity-sweep curves, and latency. Track/score
+      panels are computed fresh and held-out; sweep/latency panels read the
+      `data/processed/*.csv` artifacts when present and degrade to hints when
+      absent. Torch-free.
 - [ ] Paper skeleton: methods, benchmark table, robustness plots. ⬜
 
 ---
@@ -308,18 +329,59 @@ sequence-model cost — the next ablation slice. All knees are optimistic on the
 self-consistent synthetic fleet; the Phase 1 real-data ingest is what tests
 whether the features-vs-learned gap widens once positions carry sensor noise.
 
+**Hybrid result (synthetic, seed 1234, `run_ablation.py --sweeps --hybrid`) —
+the ablation's answer.** The fifth cell (logistic head on the 27 hand features
+⊕ the supervised Transformer's mean-pooled embedding, one held-out split with
+the rest of the grid) matches the **better** of the two supervised single-
+representation cells on every rung of every ladder:
+
+| knob | value | Logistic | Transformer | Hybrid |
+|---|---|---|---|---|
+| `jump_km` | 0.005 | 0.64 | 0.76 | 0.74 |
+| | 0.010 | 0.97 | 0.96 | 0.96 |
+| `speed_multiplier` | 1.01 | 0.67 | 0.97 | **0.98** |
+| `drift_total_km` | 0.05 | 0.81 | 0.82 | 0.81 |
+| | 0.10 | 1.00 | 0.99 | 0.99 |
+
+So the representations are **complements, not substitutes**: the embedding
+carries per-point discontinuity structure the window aggregates smooth away
+(the 1.01× / 5 m regime), the features carry everything else, and a linear
+head over the concatenation attains the ceiling of both with no loss anywhere.
+Caveats: the hybrid still pays full encoder training cost (its win is
+accuracy-dominance, not cheapness), and its edge over plain Logistic lives
+only in the extreme-subtle discontinuity regime — at every other severity
+supervised hand features alone remain the efficient frontier.
+
+**Detection-latency result (synthetic, seed 1234, `run_latency.py
+--transformer`, held-out vessels, 5% clean-window FPR, 60 s cadence).** Median
+points from onset to first alarm / detection rate, per attack family:
+
+| detector | jump | kinematic | replay | id-swap | drift |
+|---|---|---|---|---|---|
+| KinematicRule | 0 / 1.00 | 0 / 1.00 | 0 / 1.00 | 0 / **0.79** | 3 / **0.67** |
+| IsolationForest | 0 / 1.00 | 0 / 1.00 | 0 / 1.00 | 0 / 1.00 | 3 / 1.00 |
+| Logistic | 0 / 1.00 | 1 / 1.00 | 0 / 1.00 | 0 / 1.00 | 3 / 1.00 |
+| Transformer | 0 / 1.00 | 1 / 1.00 | 0 / 1.00 | 0 / 1.00 | 3 / 1.00 |
+
+At the (saturated) default severities every learned detector alarms at or
+within one point of onset while holding the FPR budget, and even gradual drift
+is caught 3 points (~3 min) in. The rule detects instantly *when it detects*
+but misses a third of drifts and a fifth of identity swaps — the metric's
+point is exactly that latency and detection rate must be read together. The
+informative follow-up once real data lands: latency at *subtle* severities,
+where the families should finally separate.
+
 ## Next actions
 
 1. ~~**Ablation: features-only vs learned**, including an *unsupervised*
    Transformer arm.~~ **Done** — the 2×2 (`scripts/run_ablation.py`) separates
-   the learned representation from supervision; results below. Remaining slice:
-   the **hybrid** cell (IsolationForest / logistic over hand features ⊕ pooled
-   encoder embedding), which would show whether the two representations are
-   complementary rather than substitutes.
-2. Detection latency: points-from-onset to first alarm (Phase 5). Pure
-   numpy over the existing per-point `is_attack` labels, so unblocked.
-3. Real MarineCadastre region ingest and re-run, including the robustness
-   sweeps and the ablation, to see how far sensor noise moves the knees
-   (Phase 1).
-4. **Stretch:** temporal GNN over co-located vessels (Phase 4). Needs the
+   the learned representation from supervision; results above.
+2. ~~**Hybrid cell** (logistic over hand features ⊕ pooled encoder
+   embedding).~~ **Done** — `--hybrid` / `HybridDetector`; results above.
+3. ~~Detection latency: points-from-onset to first alarm (Phase 5).~~
+   **Done** — `eval/latency.py` streaming-prefix harness; results above.
+4. Real MarineCadastre region ingest and re-run, including the robustness
+   sweeps, the ablation, and latency-at-subtle-severities, to see how far
+   sensor noise moves the knees (Phase 1).
+5. **Stretch:** temporal GNN over co-located vessels (Phase 4). Needs the
    `gnn` extra and probably the PostGIS neighbour queries from Phase 1.

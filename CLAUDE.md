@@ -119,6 +119,11 @@ encoder trained identically to the supervised Transformer cell. Gain over
 Logistic ⇒ the embedding adds something; gain over Transformer ⇒ the features
 do; the classifier stays linear throughout. It is supervised-only (`fit`
 raises without labels) and needs the windows frame, not the feature matrix.
+Result: the hybrid matches the *better* single representation on every rung of
+every ladder — the honest claim is "the representations are complementary; the
+embedding adds only in the extreme-subtle discontinuity regime", not "the
+hybrid is a better detector overall" (it still pays full encoder training
+cost, and elsewhere plain Logistic already sits on the frontier).
 
 **Detection latency** (`eval/latency.py`, `scripts/run_latency.py`) replays
 held-out windows as streaming prefixes. The alarm threshold is recalibrated
