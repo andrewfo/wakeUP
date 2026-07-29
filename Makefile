@@ -74,6 +74,11 @@ latency:
 dashboard:
 	$(PYTHON) scripts/run_dashboard.py --config configs/default.yaml
 
+# Stage the dashboard for GitHub Pages (served from main:/docs). Commit and
+# push docs/index.html after running this to update the public page.
+pages: dashboard
+	cp figures/dashboard.html docs/index.html
+
 test:
 	$(PYTHON) -m pytest
 
