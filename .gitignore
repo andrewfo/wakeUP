@@ -35,5 +35,6 @@ wandb/
 .DS_Store
 Thumbs.db
 
-# Local Claude Code settings
-.claude/
+# Claude Code: share the project skills, keep local settings local.
+.claude/*
+!.claude/skills/
