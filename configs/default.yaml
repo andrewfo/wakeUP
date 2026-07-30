@@ -7,7 +7,9 @@ data:
   n_vessels: 40
   duration_hours: 12.0
   cadence_s: 60          # resample cadence (seconds)
-  min_track_points: 30   # drop tracks shorter than this
+  min_track_points: 30   # drop tracks (and segments) shorter than this
+  max_gap_s: null        # split tracks at silences longer than this; null = off
+                         # (synthetic data is gap-free — set ~600 for real AIS)
   window_len: 32         # points per trajectory window
   window_stride: 16      # stride between windows (50% overlap)
   region_bbox: [36.0, -75.5, 37.5, -73.5]   # lat_min, lon_min, lat_max, lon_max

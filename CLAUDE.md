@@ -31,10 +31,18 @@ detectors, retraining each time). Run it in the background.
 ## Canonical schema
 
 Everything after ingest is `mmsi, timestamp, lat, lon, sog, cog, heading`
-(+ `gap_s` after resampling, + `window_id` / `point_idx` after windowing,
-+ `is_attack` / `attack_type` / `window_label` after injection). Synthetic and
-real AIS flow through identical code; real data enters via
-`data.pipeline.load_marinecadastre_csv`.
+(+ `segment` after gap splitting, + `gap_s` after resampling, + `window_id` /
+`point_idx` after windowing, + `is_attack` / `attack_type` / `window_label`
+after injection). Synthetic and real AIS flow through identical code; real data
+enters via `data.pipeline.load_marinecadastre_csv`.
+
+**Gap splitting is off by default.** `DataConfig.max_gap_s=None` means one
+segment per vessel, which is what every recorded number was produced under —
+the synthetic fleet has no silences, so turning it on is a verified no-op
+there. Set it (~600 s) for real AIS, where resampling across a dropout
+fabricates smooth motion that then gets labelled clean. Grouping in
+`resample_all` / `segment_windows` goes through `_group_keys`, so it degrades
+to plain `mmsi` on frames that predate the column.
 
 ## Invariants — do not break these
 

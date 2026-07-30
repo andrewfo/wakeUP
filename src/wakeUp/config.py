@@ -39,7 +39,13 @@ class DataConfig:
     n_vessels: int = 40
     duration_hours: float = 12.0
     cadence_s: int = 60          # resample cadence
-    min_track_points: int = 30   # drop shorter tracks
+    min_track_points: int = 30   # drop shorter tracks (and shorter segments)
+    # Break a track into separate segments wherever it goes quiet for longer
+    # than this, so resampling never interpolates across a real silence.
+    # ``None`` disables splitting; the synthetic fleet is gap-free, so that is
+    # the default and keeps every recorded benchmark number reproducible. Real
+    # AIS wants a finite value (600 s is a common receiver-dropout threshold).
+    max_gap_s: float | None = None
     window_len: int = 32         # points per trajectory window
     window_stride: int = 16      # overlap between windows
     region_bbox: tuple[float, float, float, float] = (

@@ -41,7 +41,8 @@ PyTorch Geometric (temporal GNN).
 - [x] `tests/`, `notebooks/`, `scripts/`.
 - [x] `Makefile` targets: `install`, `data`, `features`, `train`, `eval`,
       `figures`, `milestone`, `milestone-jump`, `robustness`, `lstm`,
-      `transformer`, `test`, `lint`, `clean`.
+      `transformer`, `ablation`, `latency`, `dashboard`, `pages`, `test`,
+      `lint`, `clean`.
 - [x] Deterministic seeds (`config.set_global_seed`).
 - [ ] Logging: no run logger yet — results land as `results.json` /
       `robustness.csv` artefacts. CSV run logger, then W&B behind an optional
@@ -63,8 +64,21 @@ PyTorch Geometric (temporal GNN).
       COG (unwrap → interp → rewrap); `gap_s` preserves true sensor gaps.
 - [x] **Window:** fixed-length overlapping windows → per-point frame with
       `window_id` / `point_idx`. Stored as parquet.
+- [x] **Split on gaps** (`split_on_gaps` / `drop_short_segments`, config
+      `max_gap_s`): break each track at silences longer than the threshold and
+      resample/window per segment, so no resampled point and no window spans a
+      real receiver dropout. Without it, resampling *fills in* a multi-hour
+      silence with fabricated smooth motion which is then labelled clean — a
+      false negative manufactured by the pipeline. `max_gap_s=None` (the
+      default) disables splitting: the synthetic fleet is gap-free, so every
+      recorded number below is unaffected, and the milestone reproduces
+      exactly. Real ingest should set it (~600 s).
 - [ ] Ingest one real region (MarineCadastre zone or Danish Maritime
-      Authority) end-to-end and re-run the benchmark. ⬜
+      Authority) end-to-end and re-run the benchmark. ⬜ Two known blockers to
+      clear first: (a) `clean_ais` unpacks `cfg.region_bbox` but never filters
+      on it, so a whole-zone download would not be cropped — enabling that
+      filter changes dataset composition, so it needs its own step; (b) real
+      position noise, which is what the reported knees are optimistic about.
 - [ ] Optional PostGIS load for spatial neighbour queries (Phase 4 GNN). ⬜
 
 ## Phase 2 — Synthetic attack generator ✅
@@ -163,8 +177,10 @@ per-point frame, not the aggregated feature matrix) and `supports_supervision`
 ## Phase 6 — Deliverable 🔨
 
 - [x] `figures/` auto-generated: `pr_curves.png`, `score_hist_iforest.png`,
-      `attack_example_jump.png`, and `robustness_curves.png` (log-x degradation
-      panel per swept knob, written by `--robustness`).
+      `attack_example_jump.png`, `robustness_curves.png` (log-x degradation
+      panel per swept knob, written by `--robustness`), and
+      `ablation_curves.png` (the same panel over the ablation grid, written by
+      `run_ablation.py --sweeps`).
 - [x] README with reproduce-in-one-command.
 - [x] Visual dashboard (`eval/dashboard.py`, `scripts/run_dashboard.py`,
       `make dashboard`): one self-contained HTML file (inline SVG + vanilla
@@ -174,6 +190,11 @@ per-point frame, not the aggregated feature matrix) and `supports_supervision`
       panels are computed fresh and held-out; sweep/latency panels read the
       `data/processed/*.csv` artifacts when present and degrade to hints when
       absent. Torch-free.
+- [x] Published via GitHub Pages from `main:/docs` — `make pages` renders the
+      dashboard and copies it to `docs/index.html`. Note the `dashboard` target
+      does *not* pass `--transformer`, so the published page carries score
+      strips for the rule / IsolationForest / Logistic cells only (its sweep
+      and latency panels still show the Transformer, since those read the CSVs).
 - [ ] Paper skeleton: methods, benchmark table, robustness plots. ⬜
 
 ---
@@ -380,8 +401,22 @@ where the families should finally separate.
    embedding).~~ **Done** — `--hybrid` / `HybridDetector`; results above.
 3. ~~Detection latency: points-from-onset to first alarm (Phase 5).~~
    **Done** — `eval/latency.py` streaming-prefix harness; results above.
-4. Real MarineCadastre region ingest and re-run, including the robustness
+4. ~~Gap-aware track segmentation, so resampling cannot invent motion across a
+   receiver dropout (Phase 1, real-ingest prerequisite).~~ **Done** —
+   `split_on_gaps` / `max_gap_s`, off by default so synthetic results are
+   unchanged (`tests/test_gap_segmentation.py` pins both the split and the
+   no-op).
+5. **Region-crop `clean_ais`.** It unpacks `cfg.region_bbox` and then ignores
+   it, so a real whole-zone download would not be cropped. Small change, but it
+   alters which points survive cleaning, so it lands as its own step with the
+   synthetic impact measured before anything is re-reported. (Synthetic vessels
+   integrate for 12 h and drift well outside the 1.5°×2.0° box, so switching
+   this on *would* move the numbers — it is not a no-op like the gap split.)
+6. Real MarineCadastre region ingest and re-run, including the robustness
    sweeps, the ablation, and latency-at-subtle-severities, to see how far
-   sensor noise moves the knees (Phase 1).
-5. **Stretch:** temporal GNN over co-located vessels (Phase 4). Needs the
+   sensor noise moves the knees (Phase 1). Now unblocked on the gap side;
+   needs (5) and a chosen zone/date.
+7. Paper skeleton: methods, benchmark table, robustness plots (Phase 6) — the
+   last ⬜ before the deliverable, and draftable now on synthetic results.
+8. **Stretch:** temporal GNN over co-located vessels (Phase 4). Needs the
    `gnn` extra and probably the PostGIS neighbour queries from Phase 1.
