@@ -73,12 +73,29 @@ PyTorch Geometric (temporal GNN).
       default) disables splitting: the synthetic fleet is gap-free, so every
       recorded number below is unaffected, and the milestone reproduces
       exactly. Real ingest should set it (~600 s).
+- [x] **Study-area crop** (`crop_to_bbox`, config `crop_to_region`): filter
+      fixes to `region_bbox` during cleaning, before the short-track filter so
+      a track the crop guts is dropped whole rather than kept as a stub. Real
+      AIS arrives by zone or by day, not by study area, and the extra vessels
+      in a whole-zone download redefine "normal" for every detector fitted on
+      it. It is a *row* filter, so a vessel that leaves the box and returns
+      keeps both stretches and gains a hole in the middle — which is precisely
+      the fabricated-motion hazard `split_on_gaps` exists for, so the two
+      belong on together for real ingest (`tests/test_region_crop.py` pins that
+      interaction). **Off by default, and unlike the gap split it is not a
+      no-op:** synthetic vessels start inside the box and then integrate out of
+      it, so enabling it on the default fleet keeps only 41.8% of cleaned fixes
+      and 46.4% of windows (1760 → 817), and 4 of 40 vessels leave entirely
+      (per-vessel retention 7.4% / 41.9% / 98.6% min / median / max). Every
+      recorded number below is `crop_to_region=False`, verified by re-running
+      the milestone unchanged.
 - [ ] Ingest one real region (MarineCadastre zone or Danish Maritime
-      Authority) end-to-end and re-run the benchmark. ⬜ Two known blockers to
-      clear first: (a) `clean_ais` unpacks `cfg.region_bbox` but never filters
-      on it, so a whole-zone download would not be cropped — enabling that
-      filter changes dataset composition, so it needs its own step; (b) real
-      position noise, which is what the reported knees are optimistic about.
+      Authority) end-to-end and re-run the benchmark. ⬜ Remaining blocker:
+      real position noise, which is what the reported knees are optimistic
+      about. The pipeline side is now ready — gap splitting and the study-area
+      crop both land with real-AIS settings (`max_gap_s≈600`,
+      `crop_to_region=True`); what is left is choosing a zone/date and
+      re-running the sweeps, the ablation and latency on it.
 - [ ] Optional PostGIS load for spatial neighbour queries (Phase 4 GNN). ⬜
 
 ## Phase 2 — Synthetic attack generator ✅
@@ -406,17 +423,18 @@ where the families should finally separate.
    `split_on_gaps` / `max_gap_s`, off by default so synthetic results are
    unchanged (`tests/test_gap_segmentation.py` pins both the split and the
    no-op).
-5. **Region-crop `clean_ais`.** It unpacks `cfg.region_bbox` and then ignores
-   it, so a real whole-zone download would not be cropped. Small change, but it
-   alters which points survive cleaning, so it lands as its own step with the
-   synthetic impact measured before anything is re-reported. (Synthetic vessels
-   integrate for 12 h and drift well outside the 1.5°×2.0° box, so switching
-   this on *would* move the numbers — it is not a no-op like the gap split.)
-6. Real MarineCadastre region ingest and re-run, including the robustness
+5. ~~**Region-crop `clean_ais`**, which unpacked `cfg.region_bbox` and then
+   ignored it.~~ **Done** — `crop_to_bbox` / `crop_to_region`, off by default
+   with the synthetic impact measured (Phase 1 above): it keeps 41.8% of fixes
+   and 46.4% of windows, so it is emphatically *not* a no-op and the flag stays
+   off for every recorded number.
+6. **Paper skeleton:** methods, benchmark table, robustness plots (Phase 6) —
+   the last ⬜ before the deliverable, fully draftable on the synthetic results
+   already in this document, and no longer gated on anything.
+7. Real MarineCadastre region ingest and re-run, including the robustness
    sweeps, the ablation, and latency-at-subtle-severities, to see how far
-   sensor noise moves the knees (Phase 1). Now unblocked on the gap side;
-   needs (5) and a chosen zone/date.
-7. Paper skeleton: methods, benchmark table, robustness plots (Phase 6) — the
-   last ⬜ before the deliverable, and draftable now on synthetic results.
+   sensor noise moves the knees (Phase 1). The pipeline is ready on both the
+   gap and crop sides; what it needs now is a chosen zone/date and a download,
+   which is the one step that is not offline-reproducible.
 8. **Stretch:** temporal GNN over co-located vessels (Phase 4). Needs the
    `gnn` extra and probably the PostGIS neighbour queries from Phase 1.

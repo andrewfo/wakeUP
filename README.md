@@ -36,7 +36,7 @@ evaluation protocol designed to say not just *whether* a detector works, but
   straight from `file://`.
 - **Fully offline, one command, seeded end-to-end** (bitwise-reproducible
   training included), with a physics-based synthetic fleet and a thin adapter
-  for real MarineCadastre data. 91 tests.
+  for real MarineCadastre data. 110 tests.
 
 ## Reproduce in one command
 

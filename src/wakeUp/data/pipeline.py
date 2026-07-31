@@ -44,21 +44,55 @@ def load_marinecadastre_csv(path: str | Path) -> pd.DataFrame:
 
 
 # --------------------------------------------------------------------------- #
+# Region cropping
+# --------------------------------------------------------------------------- #
+def crop_to_bbox(
+    df: pd.DataFrame, bbox: tuple[float, float, float, float]
+) -> pd.DataFrame:
+    """Keep only fixes inside ``(lat_min, lon_min, lat_max, lon_max)``, inclusive.
+
+    Real AIS arrives by zone or by day, not by study area: a MarineCadastre
+    download covers far more water than the region a benchmark run is about, and
+    the extra vessels change what "normal" looks like to every detector fitted
+    on it. Cropping is how the study area gets defined.
+
+    It is a *row* filter, not a track filter — a vessel that leaves the box and
+    comes back keeps both stretches, minus the excursion. That leaves a hole in
+    the middle of its track, which is exactly the fabricated-motion hazard
+    :func:`split_on_gaps` exists for, so the two belong on together for real
+    ingest.
+    """
+    lat_min, lon_min, lat_max, lon_max = bbox
+    inside = df["lat"].between(lat_min, lat_max) & df["lon"].between(lon_min, lon_max)
+    return df[inside]
+
+
+# --------------------------------------------------------------------------- #
 # Cleaning
 # --------------------------------------------------------------------------- #
 def clean_ais(df: pd.DataFrame, cfg: DataConfig) -> pd.DataFrame:
-    """Dedup, sort, drop obviously invalid rows and too-short tracks."""
+    """Dedup, sort, drop obviously invalid rows and too-short tracks.
+
+    Crops to ``cfg.region_bbox`` first when ``cfg.crop_to_region`` is set. That
+    is opt-in because, unlike the gap split, it is *not* a no-op on the
+    synthetic fleet: vessels start inside the box and then integrate for hours,
+    so most of them sail out of it.
+    """
     df = df.copy()
     df["timestamp"] = pd.to_datetime(df["timestamp"])
 
     # basic validity: lat/lon in range, non-negative SOG
-    lat_min, lon_min, lat_max, lon_max = cfg.region_bbox
     valid = (
         df["lat"].between(-90, 90)
         & df["lon"].between(-180, 180)
         & (df["sog"] >= 0)
     )
     df = df[valid]
+
+    # study-area crop, before the short-track filter so tracks the crop leaves
+    # too short to window get dropped rather than kept as stubs
+    if cfg.crop_to_region:
+        df = crop_to_bbox(df, cfg.region_bbox)
 
     # dedup exact (mmsi, timestamp) collisions, keep first
     df = df.sort_values(["mmsi", "timestamp"])

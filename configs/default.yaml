@@ -13,6 +13,9 @@ data:
   window_len: 32         # points per trajectory window
   window_stride: 16      # stride between windows (50% overlap)
   region_bbox: [36.0, -75.5, 37.5, -73.5]   # lat_min, lon_min, lat_max, lon_max
+  crop_to_region: false  # crop fixes to region_bbox when cleaning; false = off
+                         # (synthetic vessels sail out of the box, so turning
+                         #  this on moves the numbers — set true for real AIS)
 
 attack:
   seed: 7

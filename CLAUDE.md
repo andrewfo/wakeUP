@@ -44,6 +44,16 @@ fabricates smooth motion that then gets labelled clean. Grouping in
 `resample_all` / `segment_windows` goes through `_group_keys`, so it degrades
 to plain `mmsi` on frames that predate the column.
 
+**The study-area crop is off by default too, and it is NOT a no-op.**
+`DataConfig.crop_to_region=False` skips the `region_bbox` filter in
+`clean_ais`. Turn it on for real AIS (a zone-wide download is not the study
+area), but never turn it on and then compare against a recorded number:
+synthetic vessels only *start* inside the box and then integrate out, so on the
+default fleet the crop keeps 41.8% of cleaned fixes and 46.4% of windows
+(1760 → 817) and loses 4 of 40 vessels entirely. Crop and gap split belong on
+together — cropping an out-and-back excursion leaves a hole that resampling
+would otherwise interpolate straight across.
+
 ## Invariants — do not break these
 
 **Detector contract.** `fit` / `score` where **larger score == more anomalous**.

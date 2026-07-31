@@ -52,6 +52,12 @@ class DataConfig:
         # (lat_min, lon_min, lat_max, lon_max) — a patch off the US east coast
         36.0, -75.5, 37.5, -73.5,
     )
+    # Crop fixes to ``region_bbox`` during cleaning. Off by default: the
+    # synthetic fleet only *starts* inside the box and then sails out of it, so
+    # unlike the gap split this is not a no-op — enabling it changes which
+    # points survive, and with them every recorded benchmark number. Real ingest
+    # wants it on, to cut a zone-wide download down to the study area.
+    crop_to_region: bool = False
 
 
 @dataclass
