@@ -89,13 +89,20 @@ PyTorch Geometric (temporal GNN).
       (per-vessel retention 7.4% / 41.9% / 98.6% min / median / max). Every
       recorded number below is `crop_to_region=False`, verified by re-running
       the milestone unchanged.
-- [ ] Ingest one real region (MarineCadastre zone or Danish Maritime
-      Authority) end-to-end and re-run the benchmark. ⬜ Remaining blocker:
-      real position noise, which is what the reported knees are optimistic
-      about. The pipeline side is now ready — gap splitting and the study-area
-      crop both land with real-AIS settings (`max_gap_s≈600`,
-      `crop_to_region=True`); what is left is choosing a zone/date and
-      re-running the sweeps, the ablation and latency on it.
+- [x] Ingest one real region (MarineCadastre) end-to-end 🔨 — the
+      **baselines** are re-run on real AIS; the learned sweeps / ablation /
+      latency on real data are still pending. Source: `AIS_2022_01_01.csv`
+      (MarineCadastre national daily, 7.24 M fixes), cropped to the default
+      `region_bbox` (mid-Atlantic, [36, -75.5, 37.5, -73.5]) → 17,297 fixes /
+      59 vessels, then run with the real-AIS settings (`crop_to_region=True`,
+      `max_gap_s=600`) via `run_milestone.py --real-csv`. After clean / gap-
+      split / window: **1,244 windows**. Real result confirms the synthetic
+      knees were optimistic (see the real-data block under First milestone):
+      at the *default gross* severities that saturate to 1.00 on the synthetic
+      fleet, IsolationForest PR-AUC collapses to 0.66 (jump), 0.24 (id-swap),
+      0.22 (replay), 0.06 (drift, ≈chance); only `kinematic_impossible` stays
+      at 1.00. Sensor jitter and real receiver gaps bury every attack signal
+      short of a gross physics violation.
 - [ ] Optional PostGIS load for spatial neighbour queries (Phase 4 GNN). ⬜
 
 ## Phase 2 — Synthetic attack generator ✅
@@ -413,6 +420,36 @@ point is exactly that latency and detection rate must be read together. The
 informative follow-up once real data lands: latency at *subtle* severities,
 where the families should finally separate.
 
+**Real-data result (MarineCadastre `AIS_2022_01_01`, mid-Atlantic bbox, seed
+1234) — the knees were optimistic, as predicted.** One national daily file
+(7.24 M fixes) cropped to `region_bbox` → 59 vessels / 17,297 fixes, run with
+the real-AIS settings (`crop_to_region=True`, `max_gap_s=600`) →
+1,244 windows, 15% contamination. Per-attack PR-AUC at the **default (gross)**
+severities — the settings that saturate every unsupervised detector to 1.00 on
+the synthetic fleet:
+
+| attack | KinematicRule | IsolationForest | (synthetic IForest) |
+|---|---|---|---|
+| kinematic_impossible | 1.00 | 1.00 | 1.00 |
+| position_jump | 1.00 | 0.66 | 1.00 |
+| replay | 0.86 | 0.22 | ~1.00 |
+| identity_swap | 0.38 | 0.24 | 0.97 |
+| gradual_drift | 0.04 | 0.06 | 0.97 |
+| **ALL** | 0.80 | 0.70 | — |
+
+Real AIS carries natural sparsity, receiver gaps and positional jitter that a
+self-consistent synthetic fleet does not, so everything short of a gross
+kinematic violation (`kinematic_impossible`, still 1.00) is buried: the two
+subtle families IsolationForest *recovered* on synthetic (id-swap 0.97, drift
+0.97) fall to near chance on real data (0.24, 0.06). This is exactly the
+optimism the synthetic knees were flagged for. Two honest caveats: (a) these
+are the unsupervised baselines only — the learned sweeps / supervised
+ablation / latency on real data are the next slice, and supervision is where
+the synthetic story said the subtle-attack recovery actually lives; (b) one
+day / one bbox / 59 vessels is a first pass, not a tuned real benchmark.
+Reproduce: crop the raw file to the bbox, then
+`run_milestone.py --real-csv data/interim/AIS_2022_01_01_bbox.csv`.
+
 ## Next actions
 
 1. ~~**Ablation: features-only vs learned**, including an *unsupervised*
@@ -438,10 +475,14 @@ where the families should finally separate.
    figure/table checklist. What remains to *finish* the paper (not the
    skeleton) is the §2 related-work prose and the §6.7 real-data column, both
    folded into actions 7 below.
-7. Real MarineCadastre region ingest and re-run, including the robustness
-   sweeps, the ablation, and latency-at-subtle-severities, to see how far
-   sensor noise moves the knees (Phase 1). The pipeline is ready on both the
-   gap and crop sides; what it needs now is a chosen zone/date and a download,
-   which is the one step that is not offline-reproducible.
+7. Real MarineCadastre region ingest and re-run (Phase 1) — **baselines
+   done** (`run_milestone.py --real-csv`, `AIS_2022_01_01` mid-Atlantic; real
+   result recorded above). **Now the front-runner:** the learned arm on the
+   same real data — the held-out Transformer, the robustness sweeps, the
+   representation × supervision ablation, and latency-at-subtle-severities
+   (needs the `[learned]` extra / torch). The synthetic story put the subtle-
+   attack recovery on the *supervision* axis, so whether that survives real
+   sensor noise is the open question this closes. A second day / a busier bbox
+   would also firm up the single-day first pass.
 8. **Stretch:** temporal GNN over co-located vessels (Phase 4). Needs the
    `gnn` extra and probably the PostGIS neighbour queries from Phase 1.

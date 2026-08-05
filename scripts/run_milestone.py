@@ -23,6 +23,7 @@ import pandas as pd
 
 from wakeUp.config import Config, load_config, set_global_seed, REPO_ROOT
 from wakeUp.data import generate_fleet, build_dataset
+from wakeUp.data.pipeline import load_marinecadastre_csv
 from wakeUp.attacks import build_attacked_dataset, AttackType, inject_position_jump
 from wakeUp.features import build_feature_matrix
 from wakeUp.models import KinematicRuleDetector, IsolationForestDetector
@@ -61,11 +62,27 @@ def main() -> None:
         action="store_true",
         help="also run the attack-subtlety sweeps (slower: rebuilds the dataset per severity)",
     )
+    ap.add_argument(
+        "--real-csv",
+        default=None,
+        help="ingest a real MarineCadastre CSV instead of the synthetic fleet; "
+        "forces the real-AIS pipeline settings (crop_to_region, max_gap_s)",
+    )
     ap.add_argument("--outdir", default=None)
     args = ap.parse_args()
 
     cfg = load_config(args.config)
     set_global_seed(cfg.data.seed)
+
+    if args.real_csv:
+        # Real AIS is not the study area (a zone/day download covers far more
+        # water) and it carries true receiver dropouts, so the crop and the
+        # gap split belong on together — see CLAUDE.md. Force them here rather
+        # than trusting the synthetic-tuned config, but respect an explicit
+        # non-default max_gap_s if the config already set one.
+        cfg.data.crop_to_region = True
+        if cfg.data.max_gap_s is None:
+            cfg.data.max_gap_s = 600.0
 
     root = REPO_ROOT
     fig_dir = Path(args.outdir) if args.outdir else root / cfg.paths["figures"]
@@ -73,9 +90,17 @@ def main() -> None:
     fig_dir.mkdir(parents=True, exist_ok=True)
     proc_dir.mkdir(parents=True, exist_ok=True)
 
-    print("[1/6] generating synthetic fleet ...")
-    raw = generate_fleet(cfg.data)
-    print(f"      raw rows={len(raw):,}  vessels={raw['mmsi'].nunique()}")
+    if args.real_csv:
+        print(f"[1/6] loading real AIS CSV {args.real_csv} ...")
+        raw = load_marinecadastre_csv(args.real_csv)
+        print(
+            f"      raw rows={len(raw):,}  vessels={raw['mmsi'].nunique()}  "
+            f"(crop_to_region={cfg.data.crop_to_region}, max_gap_s={cfg.data.max_gap_s})"
+        )
+    else:
+        print("[1/6] generating synthetic fleet ...")
+        raw = generate_fleet(cfg.data)
+        print(f"      raw rows={len(raw):,}  vessels={raw['mmsi'].nunique()}")
 
     print("[2/6] clean -> resample -> window ...")
     windows = build_dataset(raw, cfg.data)

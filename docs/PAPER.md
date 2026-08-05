@@ -211,10 +211,29 @@ structure matters, at no cost anywhere.
 | Transformer | 1.00 on all five | 0–1 (drift: 3) |
 | KinematicRule | 1.00 gross; 0.67 drift, 0.79 id-swap | 0 (drift: 3) |
 
-### 6.7 Real MarineCadastre region — **[TODO]**
+### 6.7 Real MarineCadastre region (baselines)
 
-Gated on the Phase 1 ingest. The claim to test: sensor noise pushes every knee
-right, and it is where the features-vs-learned gap may widen.
+MarineCadastre national daily file `AIS_2022_01_01` (7.24 M fixes) cropped to
+the study bbox → 59 vessels / 17,297 fixes, run with the real-AIS pipeline
+settings (`crop_to_region=True`, `max_gap_s=600`) → 1,244 windows. Per-attack
+PR-AUC at the default (gross) severities, i.e. the settings that saturate every
+unsupervised detector to 1.00 on the synthetic fleet:
+
+| attack | KinematicRule | IsolationForest | (synth IForest) |
+|---|---|---|---|
+| kinematic_impossible | 1.00 | 1.00 | 1.00 |
+| position_jump | 1.00 | 0.66 | 1.00 |
+| replay | 0.86 | 0.22 | ~1.00 |
+| identity_swap | 0.38 | 0.24 | 0.97 |
+| gradual_drift | 0.04 | 0.06 | 0.97 |
+
+Real sparsity, receiver gaps and positional jitter bury everything short of a
+gross kinematic violation: the two subtle families IsolationForest recovered on
+the synthetic fleet fall to near chance. This confirms §7's claim that the
+synthetic knees are lower bounds. **[TODO]** the learned sweeps / supervised
+ablation / latency on real data — supervision is where the synthetic story
+located the subtle-attack recovery, so it is the column that most needs the
+real-noise test.
 
 ## 7. Threats to validity
 
