@@ -212,7 +212,11 @@ per-point frame, not the aggregated feature matrix) and `supports_supervision`
       does *not* pass `--transformer`, so the published page carries score
       strips for the rule / IsolationForest / Logistic cells only (its sweep
       and latency panels still show the Transformer, since those read the CSVs).
-- [ ] Paper skeleton: methods, benchmark table, robustness plots. ⬜
+- [x] Paper skeleton: methods, benchmark table, robustness plots
+      (`docs/PAPER.md`) — IEEE OCEANS / IEEE Access target, all eight sections
+      structured and populated from the logged synthetic results (seed 1234),
+      with a figure/table checklist and the real-data column left as an explicit
+      **[TODO]** (§6.7) rather than filled with invented numbers.
 
 ---
 
@@ -428,9 +432,12 @@ where the families should finally separate.
    with the synthetic impact measured (Phase 1 above): it keeps 41.8% of fixes
    and 46.4% of windows, so it is emphatically *not* a no-op and the flag stays
    off for every recorded number.
-6. **Paper skeleton:** methods, benchmark table, robustness plots (Phase 6) —
-   the last ⬜ before the deliverable, fully draftable on the synthetic results
-   already in this document, and no longer gated on anything.
+6. ~~**Paper skeleton:** methods, benchmark table, robustness plots
+   (Phase 6).~~ **Done** — `docs/PAPER.md`: eight sections structured for IEEE
+   OCEANS / IEEE Access, populated from the logged synthetic results, with a
+   figure/table checklist. What remains to *finish* the paper (not the
+   skeleton) is the §2 related-work prose and the §6.7 real-data column, both
+   folded into actions 7 below.
 7. Real MarineCadastre region ingest and re-run, including the robustness
    sweeps, the ablation, and latency-at-subtle-severities, to see how far
    sensor noise moves the knees (Phase 1). The pipeline is ready on both the
