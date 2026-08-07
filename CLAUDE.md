@@ -12,9 +12,18 @@ scripts need `PYTHONPATH=src`:
 PYTHONPATH=src python -m pytest -q
 PYTHONPATH=src python scripts/run_milestone.py [--single-attack position_jump]
                                                [--lstm] [--transformer] [--robustness]
+                                               [--real-csv PATH]
 PYTHONPATH=src python scripts/run_ablation.py  [--sweeps] [--lstm] [--hybrid]
 PYTHONPATH=src python scripts/run_latency.py   [--transformer] [--max-fpr 0.05]
 ```
+
+`--real-csv PATH` swaps the synthetic fleet for a real MarineCadastre CSV
+(`load_marinecadastre_csv`) and **forces the real-AIS settings** —
+`crop_to_region=True` and, unless the config already set one, `max_gap_s=600`.
+The file is a *whole-zone/day* download, so crop to `region_bbox` first
+(chunk-wise if it is large — the national daily is ~780 MB) to avoid loading it
+all into memory; point `--real-csv` at the cropped file. Real data is only the
+unsupervised baselines so far; the learned/supervised arm on it is unrun.
 
 `make test` / `make milestone` / `make robustness` / `make lstm` /
 `make transformer` / `make ablation` wrap the same commands (and assume an
@@ -100,7 +109,14 @@ whose ladders reach 1–3 orders of magnitude subtler. If a change appears to
 make no difference, check it on the sweep before concluding anything.
 
 The synthetic fleet is *perfectly* self-consistent (no position noise), so all
-reported knees are optimistic; real AIS noise should push them right.
+reported knees are optimistic; real AIS noise pushes them right, hard. The
+first real run (`AIS_2022_01_01`, mid-Atlantic bbox → 59 vessels / 1244
+windows) confirms it: at the *default gross* severities that saturate every
+unsupervised detector to 1.00 on synthetic, real IsolationForest PR-AUC falls
+to 0.66 (jump), 0.24 (id-swap), 0.22 (replay), 0.06 (drift, ~chance); only
+`kinematic_impossible` holds at 1.00. Everything short of a gross physics
+violation is buried by real sparsity and jitter. See `docs/PLANNING.md`
+(real-data result block) — the learned arm on real data is still unrun.
 
 When comparing the Transformer to the others, state that it is supervised. The
 ablation (below) sharpened the defensible claim: **supervision** buys ~a decade

@@ -252,10 +252,14 @@ since the labels they produce are what every reported metric depends on.
 
 ## Roadmap
 
-Real-region ingest (MarineCadastre / Danish Maritime Authority) to measure how
-sensor noise moves the detection knees; a temporal GNN over co-located vessels
-as the stretch model. The full phase log, including every negative result kept
-on the record, lives in [`docs/PLANNING.md`](docs/PLANNING.md).
+Real-region ingest is wired (`run_milestone.py --real-csv`, a MarineCadastre
+day cropped to the study bbox) and the unsupervised baselines are run: real
+sensor noise moves the detection knees hard right — at the default severities
+that saturate on synthetic, IsolationForest drops to near chance on the subtle
+attacks, and only gross kinematic violations survive. Re-running the learned
+and supervised arms on real data, and a temporal GNN over co-located vessels as
+the stretch model, are next. The full phase log, including every negative
+result kept on the record, lives in [`docs/PLANNING.md`](docs/PLANNING.md).
 
 ## License
 
